@@ -328,6 +328,12 @@ class RunLedger:
             row = self._fetch_task_row(conn, actual_task_id)
         return self._row_to_task(row)
 
+    def get_task(self, task_id: str) -> TaskRecord:
+        self.initialize()
+        with self._connect() as conn:
+            row = self._fetch_task_row(conn, task_id)
+        return self._row_to_task(row)
+
     def create_run(
         self,
         task_id: str,
@@ -416,7 +422,23 @@ class RunLedger:
             run_row = self._fetch_run_row(conn, run_id)
             task_row = self._fetch_task_row(conn, run_row["task_id"])
             current_state = run_row["current_state"]
+        try:
             validate_transition(current_state, to_state)
+        except InvalidStateTransitionError:
+            with self._connect() as conn:
+                self._insert_event(
+                    conn=conn,
+                    run_id=run_id,
+                    attempt_number=int(run_row["attempt_number"]),
+                    event_type="state.transition.rejected",
+                    actor_type=actor_type,
+                    actor_id=actor_id,
+                    reason_code=f"invalid state transition: {current_state!r} -> {to_state!r}",
+                    payload={"state_from": current_state, "state_to": to_state},
+                )
+            raise
+
+        with self._connect() as conn:
             now = _utc_now()
             transition_attempt_number = int(run_row["attempt_number"])
 

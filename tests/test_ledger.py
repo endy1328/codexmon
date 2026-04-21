@@ -94,6 +94,9 @@ class RunLedgerTestCase(unittest.TestCase):
         with self.assertRaises(InvalidStateTransitionError):
             self.ledger.transition_run(run.run_id, "running", "runner launched")
 
+        events = self.ledger.list_events(run.run_id)
+        self.assertIn("state.transition.rejected", [event.event_type for event in events])
+
     def test_auxiliary_records_are_persisted(self) -> None:
         task = self.ledger.create_task("auxiliary records")
         run = self.ledger.create_run(task.task_id)

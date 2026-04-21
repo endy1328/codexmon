@@ -10,6 +10,7 @@ import threading
 import time
 
 from codexmon.ledger import RunLedger
+from codexmon.state_machine import TERMINAL_STATES
 
 
 class CodexAdapterError(RuntimeError):
@@ -188,6 +189,23 @@ class CodexAdapter:
             },
             attempt_number=run.attempt_number,
         )
+
+        refreshed_run = self.ledger.get_run(run_id)
+        if refreshed_run.current_state in TERMINAL_STATES:
+            return CodexExecutionResult(
+                run_id=run_id,
+                workspace_path=str(workspace_path),
+                branch_name=assignment.branch_name,
+                command=command,
+                launched=True,
+                exit_code=exit_code,
+                duration_seconds=duration_seconds,
+                stdout_line_count=len(stdout_lines),
+                stderr_line_count=len(stderr_lines),
+                failure_signal=timeout_signal or ("" if exit_code == 0 else f"exit={exit_code}"),
+                timed_out=timeout_signal in {"idle_timeout", "wall_clock_timeout"},
+                final_state=refreshed_run.current_state,
+            )
 
         failure_signal = timeout_signal or ("" if exit_code == 0 else f"exit={exit_code}")
         timed_out = timeout_signal in {"idle_timeout", "wall_clock_timeout"}

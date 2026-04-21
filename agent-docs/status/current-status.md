@@ -6,6 +6,8 @@
 
 `구현 진행 중`
 
+첫 구현 슬라이스와 마일스톤 `M4` 인수는 완료됐다.
+
 ## 완료
 
 - 루트 `docs/*.md`가 정본 설계 원본으로 승격됐다
@@ -37,6 +39,15 @@
   command parser가 추가됐다
 - synthetic `telegram notify/receive` CLI 경로와 notifier round-trip 검증이
   추가됐다
+- 작업 패킷 B7가 완료됐다
+- local check bundle, git branch push, GitHub PR 생성, CI visibility persistence가
+  추가됐다
+- synthetic `handoff` CLI 경로와 controlled success-path PR handoff 검증이 추가됐다
+- approval-required diff classification과 `approvals scan` CLI 경로가 추가됐다
+- local `stop`, `retry`, `approvals`, `approvals scan` control plane이 추가됐다
+- invalid transition rejection event와 active runner interrupt evidence가 추가됐다
+- 단계 C acceptance validation suite와 체크리스트 대응 검증 기록이 추가됐다
+- 마일스톤 `M4`가 완료됐다
 
 ## 진행 중
 
@@ -44,14 +55,13 @@
 
 ## 대기 중
 
-- 작업 패킷 B7 착수
-- 작업 패킷 B7과 구현 이후 종단 간 인수 검증
+- supervisor 핵심 런타임 구현
+- 실제 task orchestration 구현
 
 ## 리스크 및 블로커
 
 - `pytest`, `ruff`, `uv`는 아직 설치되지 않았고 현재 baseline은 stdlib-first 기준이다
-- GitHub PR handoff와 CI visibility는 아직 없기 때문에 성공 경로는 아직 `PR opened`
-  까지 닫히지 않았다
-- 핵심 orchestration 구현은 아직 없기 때문에 인수 체크리스트는 여전히 대부분 설계 기준 문서 상태다
+- supervisor 핵심 런타임과 실제 task orchestration 구현은 아직 없다
+- 장기 실행 daemon/heartbeat 운영면은 아직 없다
 - 구현 단계는 runner, notifier, merge scope에 대한 고정 v1 결정을 다시 열지 않고
   진행해야 하며, 바꾸려면 명시적 재판단이 필요하다

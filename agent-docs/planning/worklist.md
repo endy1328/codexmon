@@ -28,12 +28,17 @@
 - 작업 패킷 B4 완료
 - 작업 패킷 B5 완료
 - 작업 패킷 B6 완료
+- 작업 패킷 B7 완료
+- approval-required diff classification과 local control plane 보강 완료
+- 단계 C acceptance validation suite 완료
+- 마일스톤 M4 완료
 - `README.md`, `agent.md`를 정본 문서 모델에 맞게 정렬
 
 ## 다음 운영 작업
 
-- 작업 패킷 B7 착수
-- `docs/EXECUTION_PLAN.md`의 작업 패킷 B7 실행
+- supervisor 핵심 런타임 구현 범위 확정
+- 실제 task orchestration 구현 착수
+- 장기 실행 heartbeat/monitor 운영면 설계
 
 ## 검증 누적
 
@@ -43,6 +48,9 @@
 - `agent-docs/validation/b4-codex-adapter-validation.md`
 - `agent-docs/validation/b5-failure-signal-validation.md`
 - `agent-docs/validation/b6-telegram-notifier-validation.md`
+- `agent-docs/validation/b7-pr-handoff-validation.md`
+- `agent-docs/validation/stage-c-acceptance-validation.md`
+
 
 ## 이후로 미루는 항목
 

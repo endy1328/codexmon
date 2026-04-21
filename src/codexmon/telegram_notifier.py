@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
+from pathlib import Path
+import signal
+import time
 from typing import Protocol
 from urllib import error, request
 
@@ -334,6 +338,7 @@ class TelegramNotifier:
             reason_code="kill switch requested via Telegram",
             payload={"inbound_message_ref": inbound_message_ref},
         )
+        self._interrupt_active_runner(command.run_id, operator_id, inbound_message_ref)
         run = self.ledger.transition_run(
             command.run_id,
             "halted",
@@ -342,6 +347,11 @@ class TelegramNotifier:
             actor_id=operator_id,
             runner_signal="telegram_stop",
             telegram_message_ref=inbound_message_ref,
+        )
+        self.ledger.release_repository_lock(
+            command.run_id,
+            actor_type="operator",
+            actor_id=operator_id,
         )
         return TelegramCommandResult(
             action="stop",
@@ -566,3 +576,117 @@ class TelegramNotifier:
             "halted": "중단",
             "cancelled": "취소",
         }.get(state, state)
+
+    def _interrupt_active_runner(
+        self,
+        run_id: str,
+        operator_id: str,
+        inbound_message_ref: str,
+    ) -> None:
+        pid = self._active_runner_pid(run_id)
+        if pid is None:
+            self.ledger.append_event(
+                run_id,
+                event_type="operator.stop.no_active_runner",
+                actor_type="operator",
+                actor_id=operator_id,
+                reason_code="no active runner pid found for stop request",
+                payload={"inbound_message_ref": inbound_message_ref},
+            )
+            return
+
+        if not self._send_signal(run_id, operator_id, pid, signal.SIGINT, "interrupt_sent", inbound_message_ref):
+            return
+        if self._wait_for_process_exit(pid, timeout_seconds=1.0):
+            return
+
+        if not self._send_signal(
+            run_id,
+            operator_id,
+            pid,
+            signal.SIGTERM,
+            "termination_sent",
+            inbound_message_ref,
+        ):
+            return
+        if self._wait_for_process_exit(pid, timeout_seconds=1.0):
+            return
+
+        self._send_signal(run_id, operator_id, pid, signal.SIGKILL, "kill_sent", inbound_message_ref)
+        self._wait_for_process_exit(pid, timeout_seconds=1.0)
+
+    def _active_runner_pid(self, run_id: str) -> int | None:
+        for event in reversed(self.ledger.list_events(run_id)):
+            if event.event_type == "runner.launched":
+                pid = event.payload.get("pid")
+                if isinstance(pid, int):
+                    return pid
+                if isinstance(pid, str) and pid.isdigit():
+                    return int(pid)
+        return None
+
+    def _send_signal(
+        self,
+        run_id: str,
+        operator_id: str,
+        pid: int,
+        sig: signal.Signals,
+        event_suffix: str,
+        inbound_message_ref: str,
+    ) -> bool:
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            self.ledger.append_event(
+                run_id,
+                event_type=f"operator.stop.{event_suffix}",
+                actor_type="operator",
+                actor_id=operator_id,
+                reason_code="runner process already exited",
+                payload={
+                    "pid": pid,
+                    "signal": sig.name,
+                    "inbound_message_ref": inbound_message_ref,
+                    "process_found": False,
+                },
+            )
+            return False
+
+        self.ledger.append_event(
+            run_id,
+            event_type=f"operator.stop.{event_suffix}",
+            actor_type="operator",
+            actor_id=operator_id,
+            reason_code=f"runner {sig.name} sent",
+            payload={
+                "pid": pid,
+                "signal": sig.name,
+                "inbound_message_ref": inbound_message_ref,
+                "process_found": True,
+            },
+        )
+        return True
+
+    def _wait_for_process_exit(self, pid: int, timeout_seconds: float) -> bool:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            if not self._is_process_alive(pid):
+                return True
+            time.sleep(0.05)
+        return not self._is_process_alive(pid)
+
+    def _is_process_alive(self, pid: int) -> bool:
+        proc_stat = f"/proc/{pid}/stat"
+        if os.path.exists(proc_stat):
+            try:
+                state = Path(proc_stat).read_text(encoding="utf-8").split()[2]
+            except (OSError, IndexError):
+                return False
+            return state != "Z"
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True

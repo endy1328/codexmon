@@ -5,7 +5,7 @@
 감지하며, 각 자율 실행을 아래 세 가지 명시적 결과 중 하나로 끝내는 것이
 목표다.
 
-현재 개발 버전은 `0.0.0.1`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
+현재 개발 버전은 `0.0.0.2`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
 왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다.
 
 - `PR opened`
@@ -14,7 +14,8 @@
 
 ## 현재 상태
 
-이 저장소는 이제 `구현 진행 중` 단계다.
+이 저장소는 이제 `구현 진행 중` 단계이며, 첫 구현 슬라이스와 마일스톤 `M4` 인수는
+완료됐다.
 
 현재 존재하는 것:
 - 정본 설계 문서 세트
@@ -29,14 +30,17 @@
 - `Codex` adapter와 fake runner 기반 lifecycle 검증
 - timeout, fingerprint, retry budget 기반 failure signal path
 - `Telegram` notifier와 outbound/inbound supervision 경로
-- 최소 `start`, `status`, `workspace`, `runner`, `telegram`, `doctor`, `version`
-  CLI와 baseline test
+- approval-required diff classification과 로컬 `approvals scan` 경로
+- GitHub PR handoff와 CI visibility persistence 경로
+- active runner interrupt 증거를 포함한 bounded halt 경로
+- 단계 C acceptance validation suite와 체크리스트 대응 검증 기록
+- 최소 `start`, `status`, `stop`, `retry`, `approvals`, `workspace`, `runner`,
+  `telegram`, `handoff`, `doctor`, `version` CLI와 baseline test
 
 아직 존재하지 않는 것:
 - supervisor 핵심 런타임
 - 실제 task orchestration 구현
-- GitHub PR handoff 연동 코드
-- 후속 작업 패킷 검증 산출물
+- 장기 실행 daemon/heartbeat 운영면
 
 ## 고정된 v1 결정
 
@@ -86,10 +90,10 @@ legible하며 recoverable하게 만드는 도구다.
 
 ## 다음 단계
 
-현재 기준선은 B6까지 완료된 상태다.
+첫 구현 슬라이스는 단계 C acceptance validation suite까지 닫힌 상태다.
 다음 프로젝트 단계는 `docs/IMPLEMENTATION_SLICE.md`와
-`docs/EXECUTION_PLAN.md`를 기준으로 마일스톤 M4의 다음 작업인
-작업 패킷 B7부터 진행하는 것이다.
+`docs/EXECUTION_PLAN.md`를 기준으로 supervisor 핵심 런타임과 실제 task
+orchestration 구현으로 넘어가는 것이다.
 
 ## 구현 기준선
 
@@ -103,6 +107,9 @@ legible하며 recoverable하게 만드는 도구다.
 - `Codex` adapter와 event-capturing `runner run` 경로
 - failure policy가 적용된 `runner supervise` 경로
 - `Telegram` notifier와 `telegram notify/receive` 경로
+- 로컬 control plane `stop`, `retry`, `approvals`, `approvals scan` 경로
+- PR handoff가 적용된 `handoff` 경로
+- stage C acceptance validation suite와 인수 체크리스트 대응 검증
 - `unittest` 기반 테스트
 - `Makefile` 기반 기본 실행 명령
 

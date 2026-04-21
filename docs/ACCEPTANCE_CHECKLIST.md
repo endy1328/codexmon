@@ -97,5 +97,12 @@
 
 ## 인수 규칙
 
-첫 데모는 위 모든 항목이 단일 종단 간 검증 실행에서 통과하고, 그 결과를
-persisted audit data로 재구성할 수 있을 때만 수용한다.
+첫 데모는 위 모든 항목이 단일 acceptance validation suite 안에서 통과하고,
+그 결과를 persisted audit data로 재구성할 수 있을 때만 수용한다.
+
+이 suite는 최소 아래 outcome별 종단 간 시나리오를 포함해야 한다.
+
+- 성공 경로: `PR opened`
+- 실패 제어 경로: timeout, fingerprint, retry budget
+- 사람 개입 경로: `needs human decision`
+- bounded halt 경로: operator stop 또는 kill-switch

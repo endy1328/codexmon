@@ -3,33 +3,33 @@
     "projectName": "codexmon",
     "pageTitle": "구현 진행 모니터",
     "phaseLabel": "구현 진행 중",
-    "updatedAt": "2026-04-21T20:57:15+09:00",
-    "currentFocus": "작업 패킷 B7 준비",
-    "currentSummary": "B6가 완료됐고 다음 작업은 PR handoff 구현이다.",
+    "updatedAt": "2026-04-21T21:24:30+09:00",
+    "currentFocus": "첫 구현 슬라이스 완료",
+    "currentSummary": "M4와 단계 C acceptance validation suite가 완료됐다. 다음 작업은 supervisor 핵심 런타임이다.",
     "activeMilestoneId": "M4",
-    "activePacketId": "B7",
+    "activePacketId": "",
     "autoRefreshSeconds": 15
   },
   "summary": {
-    "currentState": "M3 완료",
-    "nextCheckpoint": "PR Handoff 구축",
+    "currentState": "M4 완료",
+    "nextCheckpoint": "supervisor 핵심 런타임 착수",
     "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
-    "completionText": "M4 완료 시 첫 private demo와 인수 검증이 닫힌다."
+    "completionText": "첫 구현 슬라이스와 private demo acceptance suite가 닫혔다."
   },
   "runtime": {
-    "executionStatus": "running",
-    "summary": "B6 상태를 반영했고 다음으로 PR handoff와 CI visibility 경로를 진행 중이다.",
-    "lastHeartbeatAt": "2026-04-21T20:57:15+09:00",
+    "executionStatus": "idle",
+    "summary": "M4를 닫고 milestone 기준 문서, 검증 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스를 대기 중이다.",
+    "lastHeartbeatAt": "2026-04-21T21:24:30+09:00",
     "heartbeatGraceSeconds": 60,
     "activeAgents": [
       {
         "name": "Codex",
         "role": "메인 에이전트",
-        "status": "running",
-        "task": "B7 PR handoff 준비",
-        "detail": "local check bundle, PR body generator, GitHub PR creation과 CI visibility persistence 경로를 정리하고 있다.",
-        "updatedAt": "2026-04-21T20:57:15+09:00",
-        "progress": 5
+        "status": "idle",
+        "task": "다음 구현 슬라이스 대기",
+        "detail": "M4 acceptance suite와 milestone push를 닫았고 다음 포커스는 supervisor 핵심 런타임이다.",
+        "updatedAt": "2026-04-21T21:24:30+09:00",
+        "progress": 100
       }
     ]
   },
@@ -49,6 +49,10 @@
     {
       "label": "Code-Start Gate 검증",
       "href": "../validation/code-start-gate-validation.md"
+    },
+    {
+      "label": "단계 C 인수 검증",
+      "href": "../validation/stage-c-acceptance-validation.md"
     }
   ],
   "milestones": [
@@ -124,11 +128,11 @@
     {
       "id": "M4",
       "name": "성공 경로 및 인수 완료",
-      "status": "active",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "weight": 20,
       "scope": "B7 + 종단 간 인수",
-      "focus": "다음은 PR handoff와 acceptance 검증이다",
+      "focus": "PR handoff와 단계 C acceptance validation suite가 완료됐다",
       "deliverables": [
         "PR handoff success path",
         "종단 간 검증 기록"
@@ -368,10 +372,10 @@
       "id": "B7",
       "milestoneId": "M4",
       "title": "PR Handoff",
-      "status": "active",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "성공 경로를 PR opened까지 닫고 인수 검증으로 연결한다.",
-      "nextAction": "local check bundle, PR body generator, GitHub PR creation을 구현한다.",
+      "nextAction": "완료",
       "dependencies": [
         "B6 완료"
       ],
@@ -403,6 +407,18 @@
     }
   ],
   "activityLog": [
+    {
+      "time": "2026-04-21T21:24:30+09:00",
+      "status": "completed",
+      "title": "마일스톤 M4 완료",
+      "detail": "approval-required diff classification, bounded halt interrupt evidence, outcome별 acceptance validation suite를 반영하고 단계 C 인수를 닫았다."
+    },
+    {
+      "time": "2026-04-21T21:04:47+09:00",
+      "status": "completed",
+      "title": "작업 패킷 B7 완료",
+      "detail": "local check bundle, git push, GitHub PR 생성, CI visibility persistence, CLI handoff 검증을 추가했다."
+    },
     {
       "time": "2026-04-21T20:57:15+09:00",
       "status": "completed",
@@ -491,14 +507,24 @@
       "detail": "Telegram notifier outbound/inbound 경로와 CLI notify/receive가 단위 테스트로 검증됐다."
     },
     {
+      "level": "info",
+      "label": "B7 검증 완료",
+      "detail": "local check bundle, git push, fake GitHub PR creation, CLI handoff가 단위 테스트로 검증됐다."
+    },
+    {
+      "level": "info",
+      "label": "단계 C 검증 완료",
+      "detail": "acceptance validation suite가 성공, 실패 제어, 사람 개입, bounded halt 경로를 종단 간으로 검증했다."
+    },
+    {
       "level": "watch",
       "label": "stdlib-first baseline",
       "detail": "pytest, ruff, uv는 아직 설치되지 않았고 현재는 unittest와 compile check를 사용한다."
     },
     {
       "level": "watch",
-      "label": "PR handoff 미구현",
-      "detail": "GitHub PR creation, handoff summary, CI visibility는 아직 B7 범위로 남아 있다."
+      "label": "다음 슬라이스 미시작",
+      "detail": "supervisor 핵심 런타임과 실제 task orchestration 구현은 아직 착수 전이다."
     }
   ]
 }

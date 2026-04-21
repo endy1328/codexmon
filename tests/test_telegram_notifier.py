@@ -4,6 +4,9 @@ from contextlib import redirect_stdout
 from io import StringIO
 import os
 from pathlib import Path
+import shutil
+import signal
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -23,6 +26,7 @@ from codexmon.telegram_notifier import (
     TelegramNotifierError,
     TelegramTransportMessage,
 )
+from codexmon.workspace import WorktreeAllocator
 
 
 class FakeTelegramTransport:
@@ -53,8 +57,28 @@ class TelegramNotifierTestCase(unittest.TestCase):
         self.db_path = Path(self.temp_dir.name) / "codexmon.db"
         self.ledger = RunLedger(self.db_path)
         self.ledger.initialize()
+        self.repo_path = Path(self.temp_dir.name) / "repo"
+        subprocess.run(["git", "init", "-b", "main", str(self.repo_path)], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(self.repo_path), "config", "user.name", "codexmon-test"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo_path), "config", "user.email", "codexmon@example.com"],
+            check=True,
+        )
+        (self.repo_path / "README.md").write_text("temp repo\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo_path), "add", "README.md"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo_path), "commit", "-m", "init"],
+            check=True,
+            capture_output=True,
+        )
+        self.allocator = WorktreeAllocator(
+            ledger=self.ledger,
+            repo_path=self.repo_path,
+            worktree_root=self.repo_path / ".codexmon" / "worktrees",
+        )
 
     def tearDown(self) -> None:
+        shutil.rmtree(self.repo_path / ".codexmon", ignore_errors=True)
         self.temp_dir.cleanup()
 
     def make_run(self, summary: str = "telegram test") -> str:
@@ -62,9 +86,8 @@ class TelegramNotifierTestCase(unittest.TestCase):
         return self.ledger.create_run(task.task_id).run_id
 
     def move_to_running(self, run_id: str) -> None:
-        self.ledger.transition_run(run_id, "preflight", "preflight started")
-        self.ledger.transition_run(run_id, "workspace_allocated", "workspace assigned")
-        self.ledger.assign_workspace(run_id, "/tmp/codexmon/run-telegram", "codexmon/run-telegram")
+        allocation = self.allocator.allocate(run_id)
+        self.ledger.assign_workspace(run_id, allocation.workspace_path, allocation.branch_name)
         self.ledger.transition_run(run_id, "running", "runner launched")
 
     def test_notify_run_sends_summary_and_records_event(self) -> None:
@@ -128,6 +151,51 @@ class TelegramNotifierTestCase(unittest.TestCase):
         self.assertEqual(result.final_state, "halted")
         self.assertEqual(self.ledger.get_run(run_id).current_state, "halted")
 
+    def test_stop_command_interrupts_active_runner_process_and_releases_lock(self) -> None:
+        run_id = self.make_run("telegram stop active runner")
+        allocation = self.allocator.allocate(run_id)
+        workspace_path = Path(allocation.workspace_path)
+        self.ledger.transition_run(run_id, "running", "runner launched")
+        process = subprocess.Popen(
+            [
+                "python3",
+                "-c",
+                (
+                    "import signal, time\n"
+                    "signal.signal(signal.SIGINT, lambda *_: exit(130))\n"
+                    "signal.signal(signal.SIGTERM, lambda *_: exit(143))\n"
+                    "while True:\n"
+                    "    time.sleep(0.1)\n"
+                ),
+            ],
+            cwd=workspace_path,
+        )
+        self.ledger.append_event(
+            run_id,
+            event_type="runner.launched",
+            reason_code="runner launched",
+            payload={"pid": process.pid, "command": ["python3", "-c", "loop"]},
+            attempt_number=1,
+        )
+        transport = FakeTelegramTransport()
+        notifier = TelegramNotifier(self.ledger, transport=transport, default_chat_id="1001")
+
+        result = notifier.process_inbound_text(
+            text=f"/stop {run_id}",
+            operator_id="operator-5",
+            chat_id="1001",
+            message_id="91",
+        )
+        process.wait(timeout=5)
+        event_types = [event.event_type for event in self.ledger.list_events(run_id)]
+
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.final_state, "halted")
+        self.assertIsNotNone(process.returncode)
+        self.assertIn("operator.stop.interrupt_sent", event_types)
+        self.assertIn("repository.lock.released", event_types)
+        self.assertEqual(self.ledger.get_run(run_id).current_state, "halted")
+
     def test_retry_and_approve_commands_follow_allowed_transitions(self) -> None:
         retry_run_id = self.make_run("telegram retry")
         self.move_to_running(retry_run_id)
@@ -136,6 +204,7 @@ class TelegramNotifierTestCase(unittest.TestCase):
             "awaiting_human",
             "retryable-by-human: operator review requested",
         )
+        self.ledger.release_repository_lock(retry_run_id)
 
         approval_run_id = self.make_run("telegram approve")
         self.move_to_running(approval_run_id)
@@ -214,6 +283,91 @@ class TelegramNotifierCliTestCase(unittest.TestCase):
         self.assertEqual(receive_exit_code, 0)
         self.assertIn("message_ref=telegram:1001:1", notify_buffer.getvalue())
         self.assertIn("accepted=True", receive_buffer.getvalue())
+
+    def test_local_stop_retry_and_approvals_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            ledger = RunLedger(db_path)
+            ledger.initialize()
+
+            stop_task = ledger.create_task("local stop")
+            stop_run = ledger.create_run(stop_task.task_id)
+            ledger.transition_run(stop_run.run_id, "preflight", "preflight started")
+            ledger.transition_run(stop_run.run_id, "workspace_allocated", "workspace assigned")
+            ledger.assign_workspace(
+                stop_run.run_id,
+                "/tmp/codexmon/local-stop",
+                f"codexmon/{stop_run.run_id}",
+            )
+            ledger.transition_run(stop_run.run_id, "running", "runner launched")
+
+            retry_task = ledger.create_task("local retry")
+            retry_run = ledger.create_run(retry_task.task_id)
+            ledger.transition_run(retry_run.run_id, "preflight", "preflight started")
+            ledger.transition_run(retry_run.run_id, "workspace_allocated", "workspace assigned")
+            ledger.assign_workspace(
+                retry_run.run_id,
+                "/tmp/codexmon/local-retry",
+                f"codexmon/{retry_run.run_id}",
+            )
+            ledger.transition_run(retry_run.run_id, "running", "runner launched")
+            ledger.transition_run(
+                retry_run.run_id,
+                "awaiting_human",
+                "retryable-by-human: local retry requested",
+            )
+
+            approval_task = ledger.create_task("local approval")
+            approval_run = ledger.create_run(approval_task.task_id)
+            ledger.transition_run(approval_run.run_id, "preflight", "preflight started")
+            ledger.transition_run(approval_run.run_id, "workspace_allocated", "workspace assigned")
+            ledger.assign_workspace(
+                approval_run.run_id,
+                "/tmp/codexmon/local-approval",
+                f"codexmon/{approval_run.run_id}",
+            )
+            ledger.transition_run(approval_run.run_id, "running", "runner launched")
+            approval_request_id = ledger.request_approval(
+                approval_run.run_id,
+                requested_by="policy",
+                payload={"change_class": "dependency-manifest"},
+            )
+            ledger.transition_run(
+                approval_run.run_id,
+                "awaiting_human",
+                "approval required",
+                approval_request_id=approval_request_id,
+            )
+
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            with mock.patch.dict(os.environ, env, clear=True):
+                stop_buffer = StringIO()
+                with redirect_stdout(stop_buffer):
+                    stop_exit_code = main(["stop", stop_run.run_id])
+
+                retry_buffer = StringIO()
+                with redirect_stdout(retry_buffer):
+                    retry_exit_code = main(["retry", retry_run.run_id])
+
+                approvals_list_buffer = StringIO()
+                with redirect_stdout(approvals_list_buffer):
+                    approvals_list_exit_code = main(["approvals", "list", approval_run.run_id])
+
+                approvals_approve_buffer = StringIO()
+                with redirect_stdout(approvals_approve_buffer):
+                    approvals_approve_exit_code = main(
+                        ["approvals", "approve", approval_run.run_id]
+                    )
+
+        self.assertEqual(stop_exit_code, 0)
+        self.assertEqual(retry_exit_code, 0)
+        self.assertEqual(approvals_list_exit_code, 0)
+        self.assertEqual(approvals_approve_exit_code, 0)
+        self.assertIn("final_state=halted", stop_buffer.getvalue())
+        self.assertIn("final_state=retry_pending", retry_buffer.getvalue())
+        self.assertIn(f"approval_request_id={approval_request_id}", approvals_list_buffer.getvalue())
+        self.assertIn("final_state=retry_pending", approvals_approve_buffer.getvalue())
 
 
 if __name__ == "__main__":

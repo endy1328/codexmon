@@ -25,8 +25,8 @@
 
 아직 시작하지 않은 것:
 
-- 작업 패킷 B7 이후 구현
 - supervisor 핵심 런타임 구현
+- 실제 task orchestration 구현
 
 ## 실행 원칙
 
@@ -67,7 +67,10 @@
 - 작업 패킷 B6이 완료되면서 `Telegram` notifier, outbound alert,
   inbound `status/stop/retry/approve`, synthetic `telegram notify/receive`
   CLI 경로가 반영됐다
-- 다음 작업은 작업 패킷 B7다
+- 작업 패킷 B7이 완료되면서 local check bundle, branch push, GitHub PR 생성,
+  CI visibility persistence, synthetic `handoff` CLI 경로가 반영됐다
+- 단계 C acceptance validation suite까지 완료됐다
+- 다음 작업은 supervisor 핵심 런타임 구현이다
 
 ## 구현 마일스톤 개요
 
@@ -138,6 +141,7 @@
 - 선행 의존성: 작업 패킷 B6
 - 산출물: PR 생성, handoff summary, CI visibility record
 - 검증: controlled success-path run과 persisted PR reference
+- 현재 상태: 완료
 
 ## 마일스톤별 진행 방식
 
@@ -162,7 +166,7 @@
 
 현재 상태:
 - 완료
-- 후속 구현은 마일스톤 M4의 작업 패킷 B7부터 이어진다
+- 후속 구현은 supervisor 핵심 런타임 구현부터 이어진다
 
 ### 마일스톤 M1: 기반 레이어 구축
 
@@ -302,6 +306,10 @@
 종료 조건:
 - 첫 private demo를 재현 가능한 방식으로 시연할 수 있다
 
+현재 상태:
+- 완료
+- 단계 C acceptance validation suite와 인수 체크리스트 대응 검증이 반영됐다
+
 ## 단계 C: 종단 간 인수
 
 목표:
@@ -312,9 +320,15 @@
 - `docs/ACCEPTANCE_CHECKLIST.md` 전체 항목 검증
 - `agent-docs/status/current-status.md` 갱신
 - `agent-docs/validation/` 아래 전용 검증 기록 추가
+- outcome별 종단 간 시나리오를 묶은 acceptance validation suite 실행
 
 종료 조건:
 - 설계 범위를 다시 열지 않고도 bounded unattended run을 시연할 수 있다
+
+검증 결과:
+- 완료
+- 검증 기록: `agent-docs/validation/stage-c-acceptance-validation.md`
+- 구현 증거: `tests/test_acceptance_validation.py`
 
 ## 첫 Slice 이후로 미루는 항목
 
@@ -329,5 +343,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1, M2, M3는 완료됐다. 다음 작업은 마일스톤 M4의 작업 패킷 B7이고,
-이후 단계 C 인수 검증으로 이어진다.
+마일스톤 M1, M2, M3, M4는 완료됐다.
+다음 작업은 supervisor 핵심 런타임과 실제 task orchestration 구현이다.

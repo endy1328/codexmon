@@ -190,5 +190,5 @@ v1 MVP를 실행 가능한 작업 패킷으로 분해한다.
 
 ## 슬라이스 종료 조건
 
-이 슬라이스는 `docs/ACCEPTANCE_CHECKLIST.md`의 체크리스트가 실제 종단 간
-검증 실행에서 통과할 때만 완료로 본다.
+이 슬라이스는 `docs/ACCEPTANCE_CHECKLIST.md`의 체크리스트가 outcome별 종단 간
+검증 시나리오를 묶은 acceptance validation suite에서 통과할 때만 완료로 본다.

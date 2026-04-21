@@ -10,10 +10,12 @@ import platform
 import sys
 
 from codexmon import __version__
+from codexmon.approval_policy import ApprovalPolicyError, ApprovalPolicyService
 from codexmon.codex_adapter import CodexAdapter, CodexAdapterError
 from codexmon.config import Settings
 from codexmon.failure_policy import FailurePolicyResult, FailurePolicySettings, FailureSignalController
 from codexmon.ledger import LedgerError, RecordNotFoundError, RunLedger
+from codexmon.pr_handoff import GitHubApiClient, PRHandoffError, PRHandoffService
 from codexmon.telegram_notifier import (
     TelegramBotApiTransport,
     TelegramNotifier,
@@ -42,6 +44,35 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser.add_argument("run_id", nargs="?", help="조회할 run ID")
     status_parser.add_argument("--limit", type=int, default=10, help="최근 run 조회 개수")
     status_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    stop_parser = subparsers.add_parser("stop", help="로컬 kill-switch로 run을 중단합니다.")
+    stop_parser.add_argument("run_id", help="중단할 run ID")
+    stop_parser.add_argument("--operator", default="local-operator", help="operator 식별자")
+    stop_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    retry_parser = subparsers.add_parser("retry", help="로컬 operator retry를 요청합니다.")
+    retry_parser.add_argument("run_id", help="재시도할 run ID")
+    retry_parser.add_argument("--operator", default="local-operator", help="operator 식별자")
+    retry_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    approvals_parser = subparsers.add_parser("approvals", help="approval request를 조회하거나 해결합니다.")
+    approvals_subparsers = approvals_parser.add_subparsers(dest="approvals_command")
+    approvals_list_parser = approvals_subparsers.add_parser("list", help="run의 approval 목록을 조회합니다.")
+    approvals_list_parser.add_argument("run_id", help="조회할 run ID")
+    approvals_list_parser.add_argument("--status", default="", help="필터할 approval status")
+    approvals_list_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    approvals_scan_parser = approvals_subparsers.add_parser(
+        "scan",
+        help="approval-required diff classification을 수행합니다.",
+    )
+    approvals_scan_parser.add_argument("run_id", help="스캔할 run ID")
+    approvals_scan_parser.add_argument("--base-branch", default="", help="비교할 base branch")
+    approvals_scan_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    approvals_approve_parser = approvals_subparsers.add_parser(
+        "approve",
+        help="pending approval을 approved로 해결하고 run을 재개합니다.",
+    )
+    approvals_approve_parser.add_argument("run_id", help="approval을 해결할 run ID")
+    approvals_approve_parser.add_argument("--approval-request-id", default="", help="특정 approval request ID")
+    approvals_approve_parser.add_argument("--operator", default="local-operator", help="operator 식별자")
+    approvals_approve_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
     workspace_parser = subparsers.add_parser("workspace", help="worktree allocator 경로를 점검합니다.")
     workspace_subparsers = workspace_parser.add_subparsers(dest="workspace_command")
 
@@ -97,6 +128,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     receive_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
 
+    handoff_parser = subparsers.add_parser("handoff", help="PR handoff success path를 실행합니다.")
+    handoff_parser.add_argument("run_id", help="PR handoff를 수행할 run ID")
+    handoff_parser.add_argument("--title", default="", help="PR 제목 override")
+    handoff_parser.add_argument("--base-branch", default="", help="기본 base branch override")
+    handoff_parser.add_argument(
+        "--residual-risk-note",
+        default="",
+        help="PR 본문에 남길 residual risk note",
+    )
+    handoff_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+
     return parser
 
 
@@ -124,6 +166,10 @@ def command_doctor() -> int:
     print(f"wall_clock_timeout_seconds={settings.wall_clock_timeout_seconds}")
     print(f"log_level={settings.log_level}")
     print(f"github_repo={settings.github_owner}/{settings.github_repo}".rstrip("/"))
+    print(f"github_token={'<set>' if settings.github_token else '<unset>'}")
+    print(f"github_api_base={settings.github_api_base}")
+    print(f"github_base_branch={settings.github_base_branch}")
+    print(f"local_check_command={settings.local_check_command or '<unset>'}")
     print(f"telegram_bot_token={'<set>' if settings.telegram_bot_token else '<unset>'}")
     print(f"telegram_api_base={settings.telegram_api_base}")
     print(f"telegram_chat_id={settings.telegram_chat_id or '<unset>'}")
@@ -178,6 +224,84 @@ def command_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_mapping(data: object, json_mode: bool) -> None:
+    if json_mode:
+        print(json.dumps(asdict(data), ensure_ascii=False, indent=2, sort_keys=True))
+        return
+    for key, value in asdict(data).items():
+        print(f"{key}={value}")
+
+
+def command_stop(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    notifier = build_telegram_notifier(settings, ledger)
+    result = notifier.process_inbound_text(
+        text=f"/stop {args.run_id}",
+        operator_id=args.operator,
+        send_reply=False,
+    )
+    _print_mapping(result, args.json)
+    return 0 if result.accepted else 1
+
+
+def command_retry(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    notifier = build_telegram_notifier(settings, ledger)
+    result = notifier.process_inbound_text(
+        text=f"/retry {args.run_id}",
+        operator_id=args.operator,
+        send_reply=False,
+    )
+    _print_mapping(result, args.json)
+    return 0 if result.accepted else 1
+
+
+def command_approvals(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    if args.approvals_command == "scan":
+        service = ApprovalPolicyService(ledger=ledger, default_base_branch=settings.github_base_branch)
+        result = service.scan(args.run_id, base_branch=args.base_branch)
+        _print_mapping(result, args.json)
+        return 0
+
+    if args.approvals_command == "list":
+        approvals = ledger.list_approvals(args.run_id, status=args.status or None)
+        if args.json:
+            print(json.dumps([asdict(item) for item in approvals], ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            if not approvals:
+                print("no_approvals=true")
+                return 0
+            for approval in approvals:
+                print(f"approval_request_id={approval.approval_request_id}")
+                print(f"status={approval.status}")
+                print(f"requested_by={approval.requested_by or '<unset>'}")
+                print(f"resolved_by={approval.resolved_by or '<unset>'}")
+                print(f"requested_at={approval.requested_at}")
+                print(f"resolved_at={approval.resolved_at or '<unset>'}")
+                print(f"decision_note={approval.decision_note or '<unset>'}")
+                print()
+        return 0
+
+    if args.approvals_command == "approve":
+        notifier = build_telegram_notifier(settings, ledger)
+        text = f"/approve {args.run_id}"
+        if args.approval_request_id:
+            text += f" {args.approval_request_id}"
+        result = notifier.process_inbound_text(
+            text=text,
+            operator_id=args.operator,
+            send_reply=False,
+        )
+        _print_mapping(result, args.json)
+        return 0 if result.accepted else 1
+
+    raise TelegramNotifierError("approvals 하위 명령이 필요합니다.")
+
+
 def command_workspace(args: argparse.Namespace) -> int:
     settings = Settings.from_env()
     ledger = RunLedger(settings.db_path)
@@ -189,20 +313,12 @@ def command_workspace(args: argparse.Namespace) -> int:
 
     if args.workspace_command == "allocate":
         result = allocator.allocate(args.run_id)
-        if args.json:
-            print(json.dumps(asdict(result), ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in asdict(result).items():
-                print(f"{key}={value}")
+        _print_mapping(result, args.json)
         return 0
 
     if args.workspace_command == "release":
         result = allocator.release(args.run_id, cleanup=args.cleanup)
-        if args.json:
-            print(json.dumps(asdict(result), ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in asdict(result).items():
-                print(f"{key}={value}")
+        _print_mapping(result, args.json)
         return 0
 
     if args.workspace_command == "diagnose":
@@ -232,11 +348,7 @@ def command_runner(args: argparse.Namespace) -> int:
 
     if args.runner_command == "run":
         result = adapter.execute_run(args.run_id, args.instruction)
-        if args.json:
-            print(json.dumps(asdict(result), ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in asdict(result).items():
-                print(f"{key}={value}")
+        _print_mapping(result, args.json)
         return 0
 
     if args.runner_command == "supervise":
@@ -250,11 +362,7 @@ def command_runner(args: argparse.Namespace) -> int:
             ),
         )
         result: FailurePolicyResult = controller.execute(args.run_id, args.instruction)
-        if args.json:
-            print(json.dumps(asdict(result), ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in asdict(result).items():
-                print(f"{key}={value}")
+        _print_mapping(result, args.json)
         return 0
 
     raise CodexAdapterError("runner 하위 명령이 필요합니다.")
@@ -285,11 +393,7 @@ def command_telegram(args: argparse.Namespace) -> int:
             event_label=args.event_label,
             chat_id=args.chat_id,
         )
-        if args.json:
-            print(json.dumps(asdict(result), ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in asdict(result).items():
-                print(f"{key}={value}")
+        _print_mapping(result, args.json)
         return 0
 
     if args.telegram_command == "receive":
@@ -300,14 +404,41 @@ def command_telegram(args: argparse.Namespace) -> int:
             message_id=args.message_id,
             send_reply=not args.no_reply,
         )
-        if args.json:
-            print(json.dumps(asdict(result), ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in asdict(result).items():
-                print(f"{key}={value}")
+        _print_mapping(result, args.json)
         return 0 if result.accepted else 1
 
     raise TelegramNotifierError("telegram 하위 명령이 필요합니다.")
+
+
+def build_pr_handoff_service(settings: Settings, ledger: RunLedger) -> PRHandoffService:
+    github_client = None
+    if settings.github_token:
+        github_client = GitHubApiClient(
+            token=settings.github_token,
+            api_base=settings.github_api_base,
+        )
+    return PRHandoffService(
+        ledger=ledger,
+        github_client=github_client,
+        default_repo_owner=settings.github_owner,
+        default_repo_name=settings.github_repo,
+        default_base_branch=settings.github_base_branch,
+        local_check_command=settings.local_check_command,
+    )
+
+
+def command_handoff(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    service = build_pr_handoff_service(settings, ledger)
+    result = service.execute(
+        run_id=args.run_id,
+        title=args.title,
+        base_branch=args.base_branch,
+        residual_risk_note=args.residual_risk_note,
+    )
+    _print_mapping(result, args.json)
+    return 0 if result.final_state == "completed" else 1
 
 
 def print_run_projection(run: object) -> None:
@@ -348,18 +479,28 @@ def main(argv: list[str] | None = None) -> int:
             return command_start(args)
         if args.command == "status":
             return command_status(args)
+        if args.command == "stop":
+            return command_stop(args)
+        if args.command == "retry":
+            return command_retry(args)
+        if args.command == "approvals":
+            return command_approvals(args)
         if args.command == "workspace":
             return command_workspace(args)
         if args.command == "runner":
             return command_runner(args)
         if args.command == "telegram":
             return command_telegram(args)
+        if args.command == "handoff":
+            return command_handoff(args)
     except (
         LedgerError,
         RecordNotFoundError,
         WorkspaceError,
         CodexAdapterError,
+        ApprovalPolicyError,
         TelegramNotifierError,
+        PRHandoffError,
     ) as exc:
         print(str(exc), file=sys.stderr)
         return 1

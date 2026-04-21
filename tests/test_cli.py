@@ -27,9 +27,13 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("doctor", help_text)
         self.assertIn("start", help_text)
         self.assertIn("status", help_text)
+        self.assertIn("stop", help_text)
+        self.assertIn("retry", help_text)
+        self.assertIn("approvals", help_text)
         self.assertIn("workspace", help_text)
         self.assertIn("runner", help_text)
         self.assertIn("telegram", help_text)
+        self.assertIn("handoff", help_text)
 
     def test_version_command_prints_package_version(self) -> None:
         buffer = StringIO()
@@ -52,6 +56,10 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("worktree_root=", output)
         self.assertIn("codex_command=", output)
         self.assertIn("codex_sandbox=", output)
+        self.assertIn("github_token=", output)
+        self.assertIn("github_api_base=", output)
+        self.assertIn("github_base_branch=", output)
+        self.assertIn("local_check_command=", output)
         self.assertIn("telegram_bot_token=", output)
         self.assertIn("telegram_api_base=", output)
 
