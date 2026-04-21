@@ -5,6 +5,9 @@
 감지하며, 각 자율 실행을 아래 세 가지 명시적 결과 중 하나로 끝내는 것이
 목표다.
 
+현재 개발 버전은 `0.0.0.1`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
+왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다.
+
 - `PR opened`
 - `blocked with explicit reason`
 - `needs human decision`
@@ -19,12 +22,20 @@
 - 인수 및 구현 슬라이스 계획 산출물
 - code-start gate 통과 기록
 - Python 3.11 기반 저장소 초기화와 개발 기준선
-- 최소 CLI skeleton과 baseline test
+- `SQLite` 기반 durable run ledger
+- 상태 전이 guard와 synthetic persistence 검증
+- repository-wide execution lock
+- deterministic branch/worktree allocator와 진단 경로
+- `Codex` adapter와 fake runner 기반 lifecycle 검증
+- timeout, fingerprint, retry budget 기반 failure signal path
+- `Telegram` notifier와 outbound/inbound supervision 경로
+- 최소 `start`, `status`, `workspace`, `runner`, `telegram`, `doctor`, `version`
+  CLI와 baseline test
 
 아직 존재하지 않는 것:
 - supervisor 핵심 런타임
 - 실제 task orchestration 구현
-- runner, Telegram, GitHub 연동 코드
+- GitHub PR handoff 연동 코드
 - 후속 작업 패킷 검증 산출물
 
 ## 고정된 v1 결정
@@ -75,10 +86,10 @@ legible하며 recoverable하게 만드는 도구다.
 
 ## 다음 단계
 
-현재 기준선은 설계 마감과 code-start gate 검토까지 끝난 상태다.
+현재 기준선은 B6까지 완료된 상태다.
 다음 프로젝트 단계는 `docs/IMPLEMENTATION_SLICE.md`와
-`docs/EXECUTION_PLAN.md`를 기준으로 마일스톤 M1의 다음 작업인
-작업 패킷 B2부터 진행하는 것이다.
+`docs/EXECUTION_PLAN.md`를 기준으로 마일스톤 M4의 다음 작업인
+작업 패킷 B7부터 진행하는 것이다.
 
 ## 구현 기준선
 
@@ -87,6 +98,11 @@ legible하며 recoverable하게 만드는 도구다.
 - Python 3.11
 - `src/` 레이아웃 패키지 구조
 - 표준 라이브러리 중심 baseline CLI
+- `SQLite` run ledger와 synthetic `start/status` 조회 경로
+- repository lock과 `.codexmon/worktrees` 기반 allocator
+- `Codex` adapter와 event-capturing `runner run` 경로
+- failure policy가 적용된 `runner supervise` 경로
+- `Telegram` notifier와 `telegram notify/receive` 경로
 - `unittest` 기반 테스트
 - `Makefile` 기반 기본 실행 명령
 

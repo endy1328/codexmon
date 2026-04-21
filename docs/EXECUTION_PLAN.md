@@ -25,7 +25,7 @@
 
 아직 시작하지 않은 것:
 
-- 작업 패킷 B2 이후 구현
+- 작업 패킷 B7 이후 구현
 - supervisor 핵심 런타임 구현
 
 ## 실행 원칙
@@ -56,7 +56,18 @@
 - 애플리케이션 언어, 패키지 관리자, 테스트 기본선 선택은 설계 재개 이슈가 아니라
   작업 패킷 B1 안에서 확정할 구현 기준선 항목으로 본다
 - 작업 패킷 B1이 완료되면서 Git repository 초기화와 baseline CLI/test 구조가 반영됐다
-- 다음 작업은 작업 패킷 B2다
+- 작업 패킷 B2가 완료되면서 `SQLite` run ledger, 상태 전이 guard, synthetic
+  `start/status` CLI 경로가 반영됐다
+- 작업 패킷 B3이 완료되면서 repository lock, deterministic branch/worktree
+  allocator, diagnose 경로가 반영됐다
+- 작업 패킷 B4가 완료되면서 `Codex` adapter, runner launch/output/exit persistence,
+  synthetic `runner run` CLI 경로가 반영됐다
+- 작업 패킷 B5가 완료되면서 timeout, failure fingerprint, automatic retry policy,
+  synthetic `runner supervise` CLI 경로가 반영됐다
+- 작업 패킷 B6이 완료되면서 `Telegram` notifier, outbound alert,
+  inbound `status/stop/retry/approve`, synthetic `telegram notify/receive`
+  CLI 경로가 반영됐다
+- 다음 작업은 작업 패킷 B7다
 
 ## 구현 마일스톤 개요
 
@@ -87,6 +98,7 @@
 - 선행 의존성: 작업 패킷 B1
 - 산출물: task/run/event/transition persistence 경로
 - 검증: synthetic run 생성 및 transition 검증
+- 현재 상태: 완료
 
 ### 작업 패킷 B3: Worktree Allocator
 
@@ -94,6 +106,7 @@
 - 선행 의존성: 작업 패킷 B2
 - 산출물: deterministic workspace lifecycle
 - 검증: 성공적 할당과 충돌 run 거부
+- 현재 상태: 완료
 
 ### 작업 패킷 B4: Codex Adapter
 
@@ -101,6 +114,7 @@
 - 선행 의존성: 작업 패킷 B3
 - 산출물: runner launch, log capture, adapter event stream
 - 검증: controlled adapter invocation과 persisted lifecycle event
+- 현재 상태: 완료
 
 ### 작업 패킷 B5: Failure Signal Path
 
@@ -108,6 +122,7 @@
 - 선행 의존성: 작업 패킷 B4
 - 산출물: deterministic halt, retry, escalation 결정
 - 검증: timeout, duplicate fingerprint, retry-budget scenario
+- 현재 상태: 완료
 
 ### 작업 패킷 B6: Telegram Notifier
 
@@ -115,6 +130,7 @@
 - 선행 의존성: 작업 패킷 B5
 - 산출물: outbound alert와 inbound operator action
 - 검증: `status`, `stop`, `retry`, `approve`의 notifier round-trip
+- 현재 상태: 완료
 
 ### 작업 패킷 B7: PR Handoff
 
@@ -146,7 +162,7 @@
 
 현재 상태:
 - 완료
-- 후속 구현은 마일스톤 M1의 작업 패킷 B2부터 이어진다
+- 후속 구현은 마일스톤 M4의 작업 패킷 B7부터 이어진다
 
 ### 마일스톤 M1: 기반 레이어 구축
 
@@ -252,6 +268,10 @@
 다음 단계로 넘기는 조건:
 - unattended run이 remote supervision이 가능한 상태가 된다
 
+현재 상태:
+- 완료
+- 다음 구현은 마일스톤 M4의 작업 패킷 B7이다
+
 ### 마일스톤 M4: 성공 경로 및 인수 완료
 
 목표:
@@ -309,5 +329,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1은 진행 중이다. 다음 작업은 작업 패킷 B2이고,
-이후 M1 -> M2 -> M3 -> M4 순서로 진행한다.
+마일스톤 M1, M2, M3는 완료됐다. 다음 작업은 마일스톤 M4의 작업 패킷 B7이고,
+이후 단계 C 인수 검증으로 이어진다.

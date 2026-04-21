@@ -3,18 +3,35 @@
     "projectName": "codexmon",
     "pageTitle": "구현 진행 모니터",
     "phaseLabel": "구현 진행 중",
-    "updatedAt": "2026-04-21T13:20:00+09:00",
-    "currentFocus": "작업 패킷 B2 준비",
-    "currentSummary": "B1이 완료됐고 다음 작업은 SQLite 기반 run ledger 구축이다.",
-    "activeMilestoneId": "M1",
-    "activePacketId": "B2",
+    "updatedAt": "2026-04-21T20:57:15+09:00",
+    "currentFocus": "작업 패킷 B7 준비",
+    "currentSummary": "B6가 완료됐고 다음 작업은 PR handoff 구현이다.",
+    "activeMilestoneId": "M4",
+    "activePacketId": "B7",
     "autoRefreshSeconds": 15
   },
   "summary": {
-    "currentState": "M1 진행 중",
-    "nextCheckpoint": "Run Record 및 Event Persistence 구축",
+    "currentState": "M3 완료",
+    "nextCheckpoint": "PR Handoff 구축",
     "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
     "completionText": "M4 완료 시 첫 private demo와 인수 검증이 닫힌다."
+  },
+  "runtime": {
+    "executionStatus": "running",
+    "summary": "B6 상태를 반영했고 다음으로 PR handoff와 CI visibility 경로를 진행 중이다.",
+    "lastHeartbeatAt": "2026-04-21T20:57:15+09:00",
+    "heartbeatGraceSeconds": 60,
+    "activeAgents": [
+      {
+        "name": "Codex",
+        "role": "메인 에이전트",
+        "status": "running",
+        "task": "B7 PR handoff 준비",
+        "detail": "local check bundle, PR body generator, GitHub PR creation과 CI visibility persistence 경로를 정리하고 있다.",
+        "updatedAt": "2026-04-21T20:57:15+09:00",
+        "progress": 5
+      }
+    ]
   },
   "links": [
     {
@@ -55,11 +72,11 @@
     {
       "id": "M1",
       "name": "기반 레이어 구축",
-      "status": "active",
-      "percent": 34,
+      "status": "completed",
+      "percent": 100,
       "weight": 30,
       "scope": "B1-B3",
-      "focus": "저장소 기준선은 완료됐고 다음은 run ledger와 worktree/lock 기반이다",
+      "focus": "run ledger와 repository lock/worktree allocator가 완료됐다",
       "deliverables": [
         "구현 가능한 저장소 기준선",
         "SQLite 기반 run ledger",
@@ -73,11 +90,11 @@
     {
       "id": "M2",
       "name": "실행 및 실패 통제",
-      "status": "queued",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "weight": 25,
       "scope": "B4-B5",
-      "focus": "Codex 실행 경로와 bounded halt/retry 제어",
+      "focus": "Codex adapter와 failure signal path가 완료됐다",
       "deliverables": [
         "Codex adapter",
         "timeout, fingerprint, retry 정책 실행 경로"
@@ -90,11 +107,11 @@
     {
       "id": "M3",
       "name": "원격 감독 경로",
-      "status": "queued",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "weight": 15,
       "scope": "B6",
-      "focus": "Telegram 알림과 원격 action round-trip",
+      "focus": "Telegram 알림과 remote action round-trip이 완료됐다",
       "deliverables": [
         "outbound Telegram 알림",
         "status/stop/retry/approve inbound action 경로"
@@ -107,11 +124,11 @@
     {
       "id": "M4",
       "name": "성공 경로 및 인수 완료",
-      "status": "queued",
+      "status": "active",
       "percent": 0,
       "weight": 20,
       "scope": "B7 + 종단 간 인수",
-      "focus": "PR handoff와 acceptance 검증",
+      "focus": "다음은 PR handoff와 acceptance 검증이다",
       "deliverables": [
         "PR handoff success path",
         "종단 간 검증 기록"
@@ -167,10 +184,10 @@
       "id": "B2",
       "milestoneId": "M1",
       "title": "Run Record 및 Event Persistence",
-      "status": "next",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "이후 모든 작업이 의존하는 durable run ledger를 만든다.",
-      "nextAction": "SQLite schema와 state transition guard를 구현한다.",
+      "nextAction": "완료",
       "dependencies": [
         "B1 완료"
       ],
@@ -204,10 +221,10 @@
       "id": "B3",
       "milestoneId": "M1",
       "title": "Worktree Allocator",
-      "status": "queued",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "1 task = 1 run = 1 worktree = 1 branch 격리 계약을 강제한다.",
-      "nextAction": "repository lock primitive와 deterministic branch naming을 구현한다.",
+      "nextAction": "완료",
       "dependencies": [
         "B2 완료"
       ],
@@ -241,10 +258,10 @@
       "id": "B4",
       "milestoneId": "M2",
       "title": "Codex Adapter",
-      "status": "queued",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "첫 지원 runner를 실행하고 lifecycle을 관찰한다.",
-      "nextAction": "Codex 실행 wrapper와 adapter event normalization을 구현한다.",
+      "nextAction": "완료",
       "dependencies": [
         "B3 완료"
       ],
@@ -277,10 +294,10 @@
       "id": "B5",
       "milestoneId": "M2",
       "title": "Failure Signal Path",
-      "status": "queued",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "timeout, fingerprint, retry 정책으로 bounded halt와 retry를 제어한다.",
-      "nextAction": "idle timeout, wall-clock timeout, duplicate fingerprint halt를 구현한다.",
+      "nextAction": "완료",
       "dependencies": [
         "B4 완료"
       ],
@@ -316,10 +333,10 @@
       "id": "B6",
       "milestoneId": "M3",
       "title": "Telegram Notifier",
-      "status": "queued",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "원격에서 run 상태를 확인하고 개입할 수 있는 supervision 경로를 만든다.",
-      "nextAction": "Telegram bot 설정 경로와 inbound command parser를 구현한다.",
+      "nextAction": "완료",
       "dependencies": [
         "B5 완료"
       ],
@@ -351,7 +368,7 @@
       "id": "B7",
       "milestoneId": "M4",
       "title": "PR Handoff",
-      "status": "queued",
+      "status": "active",
       "percent": 0,
       "summary": "성공 경로를 PR opened까지 닫고 인수 검증으로 연결한다.",
       "nextAction": "local check bundle, PR body generator, GitHub PR creation을 구현한다.",
@@ -387,6 +404,36 @@
   ],
   "activityLog": [
     {
+      "time": "2026-04-21T20:57:15+09:00",
+      "status": "completed",
+      "title": "작업 패킷 B6 완료",
+      "detail": "Telegram notifier, outbound alert, inbound status/stop/retry/approve, CLI notify/receive 검증을 추가했다."
+    },
+    {
+      "time": "2026-04-21T20:44:14+09:00",
+      "status": "completed",
+      "title": "작업 패킷 B5 완료",
+      "detail": "timeout, fingerprint, automatic retry policy와 synthetic runner supervise 검증을 추가했다."
+    },
+    {
+      "time": "2026-04-21T20:36:55+09:00",
+      "status": "completed",
+      "title": "작업 패킷 B4 완료",
+      "detail": "Codex adapter, runner launch/output/exit persistence, fake runner 기반 CLI 검증을 추가했다."
+    },
+    {
+      "time": "2026-04-21T20:27:05+09:00",
+      "status": "completed",
+      "title": "작업 패킷 B3 완료",
+      "detail": "repository lock, deterministic branch/worktree allocator, release/diagnose 경로와 검증 테스트를 추가했다."
+    },
+    {
+      "time": "2026-04-21T20:11:39+09:00",
+      "status": "completed",
+      "title": "작업 패킷 B2 완료",
+      "detail": "SQLite run ledger, 상태 전이 guard, synthetic start/status CLI, persistence 테스트를 추가했다."
+    },
+    {
       "time": "2026-04-21T13:20:00+09:00",
       "status": "completed",
       "title": "작업 패킷 B1 완료",
@@ -419,14 +466,39 @@
       "detail": "저장소는 main branch 기준으로 초기화됐다."
     },
     {
+      "level": "info",
+      "label": "B2 검증 완료",
+      "detail": "synthetic run 생성, 상태 전이, auxiliary record persistence가 단위 테스트로 검증됐다."
+    },
+    {
+      "level": "info",
+      "label": "B3 검증 완료",
+      "detail": "temp git repository 기준으로 allocation, lock conflict, release/diagnose 경로가 단위 테스트로 검증됐다."
+    },
+    {
+      "level": "info",
+      "label": "B4 검증 완료",
+      "detail": "fake runner 기준으로 launch/output/exit persistence와 CLI runner 경로가 단위 테스트로 검증됐다."
+    },
+    {
+      "level": "info",
+      "label": "B5 검증 완료",
+      "detail": "duplicate fingerprint halt, idle/wall timeout, CLI supervise 경로가 단위 테스트로 검증됐다."
+    },
+    {
+      "level": "info",
+      "label": "B6 검증 완료",
+      "detail": "Telegram notifier outbound/inbound 경로와 CLI notify/receive가 단위 테스트로 검증됐다."
+    },
+    {
       "level": "watch",
       "label": "stdlib-first baseline",
       "detail": "pytest, ruff, uv는 아직 설치되지 않았고 현재는 unittest와 compile check를 사용한다."
     },
     {
       "level": "watch",
-      "label": "인수 문서만 존재",
-      "detail": "실제 검증 산출물은 각 작업 패킷 완료 시 누적된다."
+      "label": "PR handoff 미구현",
+      "detail": "GitHub PR creation, handoff summary, CI visibility는 아직 B7 범위로 남아 있다."
     }
   ]
 }

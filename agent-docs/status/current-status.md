@@ -19,6 +19,24 @@
 - 진행 모니터 HTML과 progress snapshot이 추가됐다
 - 작업 패킷 B1이 완료됐다
 - Python 3.11 기준 저장소 초기화와 baseline CLI/test 구조가 추가됐다
+- 작업 패킷 B2가 완료됐다
+- `SQLite` schema, migration, durable run ledger가 추가됐다
+- 상태 전이 guard와 synthetic `start/status` CLI 경로가 추가됐다
+- run, event, attempt, approval, PR reference persistence 검증이 추가됐다
+- 작업 패킷 B3가 완료됐다
+- repository-wide execution lock과 deterministic branch/worktree allocator가 추가됐다
+- worktree release/diagnose 경로와 lock 충돌 검증이 추가됐다
+- 작업 패킷 B4가 완료됐다
+- `Codex` adapter와 runner launch/output/exit persistence가 추가됐다
+- fake runner 기반 lifecycle 검증과 synthetic `runner run` CLI 경로가 추가됐다
+- 작업 패킷 B5가 완료됐다
+- timeout, failure fingerprint, automatic retry policy가 추가됐다
+- synthetic `runner supervise` CLI 경로와 failure scenario 검증이 추가됐다
+- 작업 패킷 B6가 완료됐다
+- `Telegram` notifier, outbound alert, inbound `status/stop/retry/approve`
+  command parser가 추가됐다
+- synthetic `telegram notify/receive` CLI 경로와 notifier round-trip 검증이
+  추가됐다
 
 ## 진행 중
 
@@ -26,13 +44,14 @@
 
 ## 대기 중
 
-- 작업 패킷 B2 착수
-- 작업 패킷 B2부터 작업 패킷 B7까지의 실행
-- 구현 이후 종단 간 인수 검증
+- 작업 패킷 B7 착수
+- 작업 패킷 B7과 구현 이후 종단 간 인수 검증
 
 ## 리스크 및 블로커
 
 - `pytest`, `ruff`, `uv`는 아직 설치되지 않았고 현재 baseline은 stdlib-first 기준이다
+- GitHub PR handoff와 CI visibility는 아직 없기 때문에 성공 경로는 아직 `PR opened`
+  까지 닫히지 않았다
 - 핵심 orchestration 구현은 아직 없기 때문에 인수 체크리스트는 여전히 대부분 설계 기준 문서 상태다
 - 구현 단계는 runner, notifier, merge scope에 대한 고정 v1 결정을 다시 열지 않고
   진행해야 하며, 바꾸려면 명시적 재판단이 필요하다

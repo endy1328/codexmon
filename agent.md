@@ -50,7 +50,14 @@
 현재 기술 기준선:
 - Python 3.11
 - `src/` 패키지 구조
+- `SQLite` 기반 run ledger와 상태 전이 guard
+- repository-wide lock과 git worktree allocator
+- `Codex` adapter와 runner event persistence
+- failure policy controller와 timeout/fingerprint/retry 경로
+- `Telegram` notifier와 operator action persistence 경로
 - stdlib-first CLI와 `unittest` baseline
+- synthetic `start`, `status`, `workspace`, `runner`, `telegram`, `doctor`,
+  `version` command 제공
 - 추가 개발 도구는 필요 시 점진적으로 도입
 
 ## 의사결정 및 검증 규칙
@@ -67,6 +74,14 @@
 중요한 문서 작업에는 여전히 검증이 필요하다. 별도 verification agent를 쓰지
 않는다면, 메인 에이전트가 명시적 일관성 검토를 수행하고 validation 기록을
 갱신한 뒤 작업을 닫아야 한다.
+
+## 버전 및 Git 운영 규칙
+
+- 현재 개발 버전: `0.0.0.1`
+- 버전 형식: `major.major.minor.minor`
+- 왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다
+- 각 마일스톤이 완료되면 검증을 마친 뒤 Git commit과 `origin/main` push까지
+  같은 작업 흐름에서 닫는다
 
 ## 필수 흐름
 

@@ -23,12 +23,26 @@
 - 구현 단계 마일스톤 및 세부 작업 순서 정리
 - code-start gate 검토 및 통과 기록 추가
 - 작업 패킷 B1 완료
+- 작업 패킷 B2 완료
+- 작업 패킷 B3 완료
+- 작업 패킷 B4 완료
+- 작업 패킷 B5 완료
+- 작업 패킷 B6 완료
 - `README.md`, `agent.md`를 정본 문서 모델에 맞게 정렬
 
 ## 다음 운영 작업
 
-- 작업 패킷 B2 착수
-- `docs/EXECUTION_PLAN.md`의 작업 패킷 B2 실행
+- 작업 패킷 B7 착수
+- `docs/EXECUTION_PLAN.md`의 작업 패킷 B7 실행
+
+## 검증 누적
+
+- `agent-docs/validation/b1-repository-baseline-validation.md`
+- `agent-docs/validation/b2-run-ledger-validation.md`
+- `agent-docs/validation/b3-worktree-allocator-validation.md`
+- `agent-docs/validation/b4-codex-adapter-validation.md`
+- `agent-docs/validation/b5-failure-signal-validation.md`
+- `agent-docs/validation/b6-telegram-notifier-validation.md`
 
 ## 이후로 미루는 항목
 
