@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>codexmon 구현 진행 모니터</title>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --bg-strong: #e7dcc6;
+        --panel: rgba(255, 251, 244, 0.88);
+        --panel-border: rgba(56, 46, 32, 0.12);
+        --ink: #1f2520;
+        --muted: #5d655c;
+        --accent: #165d51;
+        --accent-soft: #d8efe7;
+        --warn: #c46a28;
+        --warn-soft: #fde5cf;
+        --danger: #a23a2f;
+        --danger-soft: #f9d9d2;
+        --done: #1f6c4f;
+        --done-soft: #d9efe1;
+        --queued: #6a6f63;
+        --queued-soft: #ece8de;
+        --shadow: 0 18px 40px rgba(53, 44, 28, 0.08);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(226, 205, 152, 0.35), transparent 34%),
+          radial-gradient(circle at top right, rgba(58, 126, 109, 0.18), transparent 26%),
+          linear-gradient(180deg, #f8f4eb 0%, #f1eadc 100%);
+        font-family: "Avenir Next", "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        inset: auto;
+        width: 22rem;
+        height: 22rem;
+        border-radius: 50%;
+        filter: blur(70px);
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.45;
+      }
+
+      body::before {
+        top: -8rem;
+        left: -6rem;
+        background: rgba(181, 146, 77, 0.24);
+      }
+
+      body::after {
+        right: -7rem;
+        bottom: -8rem;
+        background: rgba(22, 93, 81, 0.16);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        position: relative;
+        z-index: 1;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 28px 20px 40px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .hero-card,
+      .panel {
+        background: var(--panel);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--panel-border);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-card {
+        padding: 28px 28px 24px;
+        overflow: hidden;
+      }
+
+      .hero-card h1,
+      .panel h2,
+      .panel h3 {
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+
+      .hero-card h1 {
+        font-size: clamp(2rem, 5vw, 3.8rem);
+        line-height: 0.94;
+        margin-top: 8px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        background: rgba(255, 255, 255, 0.56);
+        border: 1px solid rgba(56, 46, 32, 0.1);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-copy {
+        max-width: 46rem;
+        color: var(--muted);
+        font-size: 1.02rem;
+        line-height: 1.6;
+        margin: 14px 0 0;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .stat-tile {
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.64);
+        border: 1px solid rgba(56, 46, 32, 0.08);
+      }
+
+      .stat-tile span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-bottom: 8px;
+      }
+
+      .stat-tile strong {
+        font-size: 1.4rem;
+        letter-spacing: -0.03em;
+      }
+
+      .hero-side {
+        padding: 22px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .progress-meter {
+        display: grid;
+        gap: 14px;
+      }
+
+      .meter-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: baseline;
+      }
+
+      .meter-label {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .meter-value {
+        font-size: 2.6rem;
+        line-height: 1;
+        letter-spacing: -0.05em;
+        font-weight: 700;
+      }
+
+      .bar-track {
+        width: 100%;
+        height: 14px;
+        background: rgba(31, 37, 32, 0.08);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #165d51 0%, #2d8b72 100%);
+        transition: width 240ms ease;
+      }
+
+      .chips,
+      .stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        border: 1px solid transparent;
+      }
+
+      .chip.phase {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(56, 46, 32, 0.1);
+      }
+
+      .chip.completed {
+        background: var(--done-soft);
+        color: var(--done);
+      }
+
+      .chip.active {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .chip.next {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .chip.queued {
+        background: var(--queued-soft);
+        color: var(--queued);
+      }
+
+      .chip.blocked {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .panel {
+        padding: 22px;
+      }
+
+      .panel.span-12 {
+        grid-column: span 12;
+      }
+
+      .panel.span-8 {
+        grid-column: span 8;
+      }
+
+      .panel.span-4 {
+        grid-column: span 4;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+      }
+
+      .panel-head p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .control-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .input,
+      .select,
+      .button {
+        border-radius: 999px;
+        border: 1px solid rgba(56, 46, 32, 0.14);
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--ink);
+        padding: 10px 14px;
+        font: inherit;
+      }
+
+      .input {
+        min-width: 220px;
+      }
+
+      .button {
+        cursor: pointer;
+        font-weight: 700;
+        transition: transform 160ms ease, background 160ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.96);
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+      }
+
+      .toggle input {
+        width: 18px;
+        height: 18px;
+      }
+
+      .banner {
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        line-height: 1.55;
+        font-size: 0.95rem;
+      }
+
+      .banner.ok {
+        background: var(--done-soft);
+        color: var(--done);
+      }
+
+      .banner.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .milestone-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+
+      .milestone-card,
+      .packet-card,
+      .mini-card {
+        border: 1px solid rgba(56, 46, 32, 0.1);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.66);
+        padding: 18px;
+      }
+
+      .milestone-card h3,
+      .packet-card h3,
+      .mini-card h3 {
+        font-size: 1.2rem;
+      }
+
+      .milestone-meta,
+      .packet-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0 14px;
+      }
+
+      .kpi {
+        font-weight: 800;
+        font-size: 1.6rem;
+        letter-spacing: -0.04em;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .list {
+        margin: 0;
+        padding-left: 18px;
+        line-height: 1.58;
+        color: var(--muted);
+      }
+
+      .list strong {
+        color: var(--ink);
+      }
+
+      .packet-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      details.packet-card summary {
+        list-style: none;
+        cursor: pointer;
+      }
+
+      details.packet-card summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .packet-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .packet-top h3 {
+        margin-bottom: 6px;
+      }
+
+      .packet-summary {
+        color: var(--muted);
+        margin: 8px 0 0;
+        line-height: 1.55;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .activity-stream {
+        display: grid;
+        gap: 12px;
+      }
+
+      .activity-item {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 14px;
+        padding: 14px;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.64);
+        border: 1px solid rgba(56, 46, 32, 0.08);
+      }
+
+      .activity-time {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .activity-title {
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .status-board {
+        display: grid;
+        gap: 12px;
+      }
+
+      .status-item {
+        padding: 14px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(56, 46, 32, 0.08);
+        background: rgba(255, 255, 255, 0.64);
+      }
+
+      .status-item.info {
+        border-color: rgba(22, 93, 81, 0.14);
+      }
+
+      .status-item.watch {
+        border-color: rgba(196, 106, 40, 0.16);
+      }
+
+      .links {
+        display: grid;
+        gap: 10px;
+      }
+
+      .link-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        text-decoration: none;
+        padding: 14px 16px;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.68);
+        border: 1px solid rgba(56, 46, 32, 0.08);
+      }
+
+      .link-card span:last-child {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .footer-note {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 1120px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .panel.span-8,
+        .panel.span-4 {
+          grid-column: span 12;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          padding: 16px 12px 32px;
+        }
+
+        .hero-card,
+        .panel,
+        .hero-side {
+          padding: 18px;
+        }
+
+        .hero-grid,
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .activity-item {
+          grid-template-columns: 1fr;
+        }
+
+        .packet-top {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <article class="hero-card">
+          <span class="eyebrow">codexmon / 구현 모니터</span>
+          <h1 id="page-title">실시간 작업 진행 현황</h1>
+          <p class="hero-copy" id="hero-copy"></p>
+
+          <div class="hero-grid">
+            <div class="stat-tile">
+              <span>현재 상태</span>
+              <strong id="current-state">-</strong>
+            </div>
+            <div class="stat-tile">
+              <span>다음 체크포인트</span>
+              <strong id="next-checkpoint">-</strong>
+            </div>
+            <div class="stat-tile">
+              <span>진행 규칙</span>
+              <strong id="completion-rule">-</strong>
+            </div>
+          </div>
+        </article>
+
+        <aside class="hero-card hero-side">
+          <div class="progress-meter">
+            <div class="meter-row">
+              <span class="meter-label">전체 진행률</span>
+              <strong class="meter-value" id="overall-percent">0%</strong>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill" id="overall-bar"></div>
+            </div>
+            <div class="chips">
+              <span class="chip phase" id="phase-chip">단계</span>
+              <span class="chip queued" id="updated-chip">갱신 시각</span>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="stat-tile">
+              <span>마일스톤</span>
+              <strong id="milestone-count">0 / 0</strong>
+            </div>
+            <div class="stat-tile">
+              <span>작업 패킷</span>
+              <strong id="packet-count">0 / 0</strong>
+            </div>
+            <div class="stat-tile">
+              <span>현재 포커스</span>
+              <strong id="focus-chip">-</strong>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid">
+        <article class="panel span-12">
+          <div class="panel-head">
+            <div>
+              <h2>새로고침 제어</h2>
+              <p>정적 서버로 열면 `progress.json`을 주기적으로 다시 읽습니다. 파일로 직접 열면 마지막 내장 스냅샷을 보여줍니다.</p>
+            </div>
+            <div class="control-row">
+              <label class="toggle">
+                <input type="checkbox" id="auto-refresh-toggle" checked>
+                자동 새로고침
+              </label>
+              <select class="select" id="refresh-interval">
+                <option value="10">10초</option>
+                <option value="15" selected>15초</option>
+                <option value="30">30초</option>
+                <option value="60">60초</option>
+              </select>
+              <button class="button" id="refresh-now" type="button">지금 새로고침</button>
+            </div>
+          </div>
+          <div id="refresh-banner" class="banner warn"></div>
+        </article>
+
+        <article class="panel span-8">
+          <div class="panel-head">
+            <div>
+              <h2>마일스톤 보드</h2>
+              <p>현재 구현 단계를 기준으로 완료, 다음, 대기 상태를 한 번에 확인할 수 있습니다.</p>
+            </div>
+          </div>
+          <div class="milestone-grid" id="milestone-grid"></div>
+        </article>
+
+        <article class="panel span-4">
+          <div class="panel-head">
+            <div>
+              <h2>문서 바로가기</h2>
+              <p>정본 문서와 운영 기록으로 바로 이동합니다.</p>
+            </div>
+          </div>
+          <div class="links" id="links-list"></div>
+        </article>
+
+        <article class="panel span-8">
+          <div class="panel-head">
+            <div>
+              <h2>작업 패킷 트래커</h2>
+              <p>마일스톤, 상태, 검색어로 필터링해 현재 어떤 작업을 해야 하는지 바로 볼 수 있습니다.</p>
+            </div>
+            <div class="control-row">
+              <select class="select" id="milestone-filter">
+                <option value="all">모든 마일스톤</option>
+              </select>
+              <select class="select" id="status-filter">
+                <option value="all">모든 상태</option>
+                <option value="completed">완료</option>
+                <option value="active">진행 중</option>
+                <option value="next">다음</option>
+                <option value="queued">대기</option>
+                <option value="blocked">차단</option>
+              </select>
+              <input class="input" id="search-filter" type="search" placeholder="패킷 제목, 작업, 산출물 검색">
+            </div>
+          </div>
+          <div class="packet-list" id="packet-list"></div>
+        </article>
+
+        <article class="panel span-4">
+          <div class="panel-head">
+            <div>
+              <h2>상태 관찰 항목</h2>
+              <p>현재 차단 요소와 주시 항목을 분리해서 보여줍니다.</p>
+            </div>
+          </div>
+          <div class="status-board" id="status-board"></div>
+        </article>
+
+        <article class="panel span-12">
+          <div class="panel-head">
+            <div>
+              <h2>최근 활동</h2>
+              <p>상태 스냅샷이 최근에 어떻게 갱신되었는지 시간 순으로 보여줍니다.</p>
+            </div>
+          </div>
+          <div class="activity-stream" id="activity-stream"></div>
+          <p class="footer-note" id="footer-note"></p>
+        </article>
+      </section>
+    </div>
+
+    <script id="embedded-progress" type="application/json">
+      {
+        "meta": {
+          "projectName": "codexmon",
+          "pageTitle": "구현 진행 모니터",
+          "phaseLabel": "구현 진행 중",
+          "updatedAt": "2026-04-21T13:20:00+09:00",
+          "currentFocus": "작업 패킷 B2 준비",
+          "currentSummary": "B1이 완료됐고 다음 작업은 SQLite 기반 run ledger 구축이다.",
+          "activeMilestoneId": "M1",
+          "activePacketId": "B2",
+          "autoRefreshSeconds": 15
+        },
+        "summary": {
+          "currentState": "M1 진행 중",
+          "nextCheckpoint": "Run Record 및 Event Persistence 구축",
+          "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
+          "completionText": "M4 완료 시 첫 private demo와 인수 검증이 닫힌다."
+        },
+        "links": [
+          { "label": "정본 실행 계획", "href": "../../docs/EXECUTION_PLAN.md" },
+          { "label": "구현 슬라이스", "href": "../../docs/IMPLEMENTATION_SLICE.md" },
+          { "label": "현재 상태 기록", "href": "./current-status.md" },
+          { "label": "Code-Start Gate 검증", "href": "../validation/code-start-gate-validation.md" }
+        ],
+        "milestones": [
+          { "id": "M0", "name": "구현 진입 승인", "status": "completed", "percent": 100, "weight": 10, "scope": "code-start gate", "focus": "구현 시작 승인 완료", "deliverables": ["code-start gate 통과 기록", "구현 시작 기준 상태 스냅샷"], "exitCriteria": ["작업 패킷 B1을 설계 재개 없이 시작할 수 있다", "Git 미초기화 상태가 B1 범위로 정리됐다"] },
+          { "id": "M1", "name": "기반 레이어 구축", "status": "active", "percent": 34, "weight": 30, "scope": "B1-B3", "focus": "저장소 기준선은 완료됐고 다음은 run ledger와 worktree/lock 기반이다", "deliverables": ["구현 가능한 저장소 기준선", "SQLite 기반 run ledger", "repository lock 및 worktree allocator"], "exitCriteria": ["runner 없이도 run 생성과 상태 전이가 가능하다", "두 번째 autonomous run이 lock 때문에 거부된다"] },
+          { "id": "M2", "name": "실행 및 실패 통제", "status": "queued", "percent": 0, "weight": 25, "scope": "B4-B5", "focus": "Codex 실행 경로와 bounded halt/retry 제어", "deliverables": ["Codex adapter", "timeout, fingerprint, retry 정책 실행 경로"], "exitCriteria": ["launch, output, exit event가 저장된다", "duplicate fingerprint halt와 automatic retry budget이 동작한다"] },
+          { "id": "M3", "name": "원격 감독 경로", "status": "queued", "percent": 0, "weight": 15, "scope": "B6", "focus": "Telegram 알림과 원격 action round-trip", "deliverables": ["outbound Telegram 알림", "status/stop/retry/approve inbound action 경로"], "exitCriteria": ["상태 변화가 Telegram으로 전달된다", "remote action이 유효한 state transition으로 이어진다"] },
+          { "id": "M4", "name": "성공 경로 및 인수 완료", "status": "queued", "percent": 0, "weight": 20, "scope": "B7 + 종단 간 인수", "focus": "PR handoff와 acceptance 검증", "deliverables": ["PR handoff success path", "종단 간 검증 기록"], "exitCriteria": ["실제 PR reference가 남는다", "인수 체크리스트 전체가 증거와 함께 검증된다"] }
+        ],
+        "packets": [
+          { "id": "B1", "milestoneId": "M1", "title": "Repository 초기화와 개발 기준선", "status": "completed", "percent": 100, "summary": "저장소를 실제 구현이 가능한 기본 상태로 만든다.", "nextAction": "완료", "dependencies": ["M0 통과"], "deliverables": ["구현 가능 저장소 기준선", "프로젝트 루트 구조", "개발 규약"], "tasks": ["Git repository 초기화", "기본 branch 규약 및 .gitignore 기준선 확정", "프로젝트 루트 구조와 모듈 경계 생성", "애플리케이션 언어와 패키지 관리자 확정", "테스트, lint, format 실행 기본선 확정", "로컬 개발 환경 변수/설정 파일 템플릿 작성"], "doneCriteria": ["저장소가 첫 구현 슬라이스를 수용할 준비가 됐다", "기본 개발 규약과 실행 경로가 정해졌다"], "verification": ["code-start checklist 통과 여부 확인", "repository baseline 검토"], "docsToUpdate": ["README.md", "agent.md", "agent-docs/status/current-status.md", "agent-docs/validation/*", "docs/EXECUTION_PLAN.md"] },
+          { "id": "B2", "milestoneId": "M1", "title": "Run Record 및 Event Persistence", "status": "next", "percent": 0, "summary": "이후 모든 작업이 의존하는 durable run ledger를 만든다.", "nextAction": "SQLite schema와 state transition guard를 구현한다.", "dependencies": ["B1 완료"], "deliverables": ["task/run/attempt/event/state-transition 모델", "failure fingerprint, approval, PR reference 저장 구조"], "tasks": ["SQLite schema 및 migration 방식 정의", "task/run/attempt/event/state-transition 모델 생성", "failure fingerprint 저장 구조 생성", "approval 및 PR reference 저장 구조 생성", "state transition guard와 projection query 구현", "synthetic fixture 기반 저장/조회 검증 작성"], "doneCriteria": ["runner integration 없이도 run 생성과 query가 가능하다", "invalid transition이 거부된다"], "verification": ["synthetic run 저장/조회 검증", "허용된 transition과 invalid transition 분리 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "schema 관련 설계 문서"] },
+          { "id": "B3", "milestoneId": "M1", "title": "Worktree Allocator", "status": "queued", "percent": 0, "summary": "1 task = 1 run = 1 worktree = 1 branch 격리 계약을 강제한다.", "nextAction": "repository lock primitive와 deterministic branch naming을 구현한다.", "dependencies": ["B2 완료"], "deliverables": ["repository-wide lock", "worktree create/remove lifecycle", "run과 worktree/branch mapping"], "tasks": ["repository-wide lock primitive 구현", "deterministic branch naming 구현", "worktree create/remove lifecycle 구현", "run과 worktree/branch mapping persistence 연결", "crash 이후 lock/worktree 진단 경로 작성"], "doneCriteria": ["run이 repository를 예약하고 worktree를 할당할 수 있다", "충돌하는 두 번째 run이 거부된다"], "verification": ["worktree 할당 성공", "lock 충돌 시도 거부 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "docs/ACCEPTANCE_CHECKLIST.md"] },
+          { "id": "B4", "milestoneId": "M2", "title": "Codex Adapter", "status": "queued", "percent": 0, "summary": "첫 지원 runner를 실행하고 lifecycle을 관찰한다.", "nextAction": "Codex 실행 wrapper와 adapter event normalization을 구현한다.", "dependencies": ["B3 완료"], "deliverables": ["Codex 실행 wrapper", "stdout/stderr/exit signal capture", "structured adapter event"], "tasks": ["Codex 실행 wrapper 구현", "task instruction과 run metadata 주입 방식 구현", "stdout/stderr/exit signal capture 구현", "adapter event normalization 구현", "launch 실패와 즉시 종료 케이스 처리"], "doneCriteria": ["Codex가 run workspace에서 시작된다", "launch, output, exit event가 저장된다"], "verification": ["controlled runner invocation", "persisted lifecycle event 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*"] },
+          { "id": "B5", "milestoneId": "M2", "title": "Failure Signal Path", "status": "queued", "percent": 0, "summary": "timeout, fingerprint, retry 정책으로 bounded halt와 retry를 제어한다.", "nextAction": "idle timeout, wall-clock timeout, duplicate fingerprint halt를 구현한다.", "dependencies": ["B4 완료"], "deliverables": ["idle timeout 감지기", "wall-clock timeout 감지기", "failure fingerprint normalization 및 retry budget enforcement"], "tasks": ["idle timeout 감지기 구현", "wall-clock timeout 감지기 구현", "failure fingerprint normalization 구현", "duplicate fingerprint halt rule 구현", "automatic retry budget enforcement 구현", "halt / retry / escalation reason code 정규화"], "doneCriteria": ["반복 실패, idle stall, retry 거부가 deterministic하게 기록된다", "automatic retry는 최대 한 번만 수행된다"], "verification": ["timeout scenario 실행", "duplicate fingerprint halt 확인", "retry-budget scenario 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "docs/POLICY_BASELINE.md"] },
+          { "id": "B6", "milestoneId": "M3", "title": "Telegram Notifier", "status": "queued", "percent": 0, "summary": "원격에서 run 상태를 확인하고 개입할 수 있는 supervision 경로를 만든다.", "nextAction": "Telegram bot 설정 경로와 inbound command parser를 구현한다.", "dependencies": ["B5 완료"], "deliverables": ["Telegram 상태 알림", "status/stop/retry/approve inbound action"], "tasks": ["Telegram bot 설정 및 credential 주입 경로 구현", "상태 알림 메시지 포맷 구현", "status/stop/retry/approve command parser 구현", "inbound action과 orchestrator event 연결", "notifier 실패 시 오류 기록 및 재시도 정책 반영"], "doneCriteria": ["Telegram으로 상태 변화가 전달된다", "remote action이 유효한 state transition을 만든다"], "verification": ["notifier round-trip 확인", "status/stop/retry/approve 동작 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*"] },
+          { "id": "B7", "milestoneId": "M4", "title": "PR Handoff", "status": "queued", "percent": 0, "summary": "성공 경로를 PR opened까지 닫고 인수 검증으로 연결한다.", "nextAction": "local check bundle, PR body generator, GitHub PR creation을 구현한다.", "dependencies": ["B6 완료"], "deliverables": ["PR 생성 경로", "handoff summary", "CI visibility snapshot"], "tasks": ["local check bundle 실행 경로 구현", "PR summary/body generator 구현", "GitHub PR creation 연동 구현", "PR reference 및 CI visibility persistence 구현", "end-to-end demo task와 handoff artifact 검증"], "doneCriteria": ["성공한 run이 실제 PR reference를 남긴다", "인수 체크리스트 검증의 기반이 마련된다"], "verification": ["controlled success-path run", "PR reference, summary body, CI visibility 저장 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "README.md"] }
+        ],
+        "activityLog": [
+          { "time": "2026-04-21T13:20:00+09:00", "status": "completed", "title": "작업 패킷 B1 완료", "detail": "Git repository 초기화, Python 3.11 baseline CLI, unittest, Makefile, env template을 추가했다." },
+          { "time": "2026-04-21T12:00:00+09:00", "status": "completed", "title": "Code-Start Gate 통과", "detail": "구현 시작 가능 판정과 승인 범위를 기록했다." },
+          { "time": "2026-04-21T11:40:00+09:00", "status": "completed", "title": "하네스 문서 분리", "detail": "planning, status, validation, decisions 문서를 agent-docs로 이동했다." },
+          { "time": "2026-04-21T11:10:00+09:00", "status": "completed", "title": "구현 마일스톤 정리", "detail": "M0-M4, B1-B7 계획과 세부 작업을 정본 문서에 반영했다." }
+        ],
+        "blockers": [],
+        "watchItems": [
+          { "level": "info", "label": "Git 초기화 완료", "detail": "저장소는 main branch 기준으로 초기화됐다." },
+          { "level": "watch", "label": "stdlib-first baseline", "detail": "pytest, ruff, uv는 아직 설치되지 않았고 현재는 unittest와 compile check를 사용한다." },
+          { "level": "watch", "label": "인수 문서만 존재", "detail": "실제 검증 산출물은 각 작업 패킷 완료 시 누적된다." }
+        ]
+      }
+    </script>
+    <script>
+      const embeddedSnapshot = JSON.parse(document.getElementById("embedded-progress").textContent);
+      const statusMeta = {
+        completed: { label: "완료", className: "completed" },
+        active: { label: "진행 중", className: "active" },
+        next: { label: "다음", className: "next" },
+        queued: { label: "대기", className: "queued" },
+        blocked: { label: "차단", className: "blocked" }
+      };
+
+      const state = {
+        data: embeddedSnapshot,
+        source: "embedded",
+        autoRefresh: true,
+        intervalSeconds: embeddedSnapshot.meta.autoRefreshSeconds || 15,
+        timerId: null,
+        milestoneFilter: "all",
+        statusFilter: "all",
+        searchFilter: ""
+      };
+
+      const elements = {
+        pageTitle: document.getElementById("page-title"),
+        heroCopy: document.getElementById("hero-copy"),
+        currentState: document.getElementById("current-state"),
+        nextCheckpoint: document.getElementById("next-checkpoint"),
+        completionRule: document.getElementById("completion-rule"),
+        overallPercent: document.getElementById("overall-percent"),
+        overallBar: document.getElementById("overall-bar"),
+        phaseChip: document.getElementById("phase-chip"),
+        updatedChip: document.getElementById("updated-chip"),
+        milestoneCount: document.getElementById("milestone-count"),
+        packetCount: document.getElementById("packet-count"),
+        focusChip: document.getElementById("focus-chip"),
+        refreshBanner: document.getElementById("refresh-banner"),
+        autoRefreshToggle: document.getElementById("auto-refresh-toggle"),
+        refreshInterval: document.getElementById("refresh-interval"),
+        refreshNow: document.getElementById("refresh-now"),
+        milestoneGrid: document.getElementById("milestone-grid"),
+        milestoneFilter: document.getElementById("milestone-filter"),
+        statusFilter: document.getElementById("status-filter"),
+        searchFilter: document.getElementById("search-filter"),
+        packetList: document.getElementById("packet-list"),
+        statusBoard: document.getElementById("status-board"),
+        activityStream: document.getElementById("activity-stream"),
+        linksList: document.getElementById("links-list"),
+        footerNote: document.getElementById("footer-note")
+      };
+
+      function formatDate(value) {
+        return new Intl.DateTimeFormat("ko-KR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderList(items) {
+        if (!items || items.length === 0) {
+          return "<p class=\"muted\">없음</p>";
+        }
+
+        return `<ul class="list">${items
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join("")}</ul>`;
+      }
+
+      function getOverallPercent(data) {
+        const weightedTotal = data.milestones.reduce((sum, item) => sum + (item.weight || 0), 0);
+        if (!weightedTotal) {
+          return 0;
+        }
+
+        const value = data.milestones.reduce((sum, item) => {
+          return sum + ((item.weight || 0) * (item.percent || 0)) / 100;
+        }, 0);
+
+        return Math.round((value / weightedTotal) * 100);
+      }
+
+      function setRefreshBanner() {
+        const liveCapable = location.protocol === "http:" || location.protocol === "https:";
+
+        if (!liveCapable) {
+          elements.refreshBanner.className = "banner warn";
+          elements.refreshBanner.textContent = "파일 직접 열기 모드입니다. 자동 동기화는 동작하지 않고, 마지막 내장 스냅샷을 표시합니다. 정적 서버로 열면 progress.json을 주기적으로 다시 읽습니다.";
+          return;
+        }
+
+        if (state.source === "live") {
+          elements.refreshBanner.className = "banner ok";
+          elements.refreshBanner.textContent = `실시간 모드입니다. ${state.intervalSeconds}초마다 progress.json을 다시 읽습니다.`;
+          return;
+        }
+
+        elements.refreshBanner.className = "banner warn";
+        elements.refreshBanner.textContent = "progress.json을 읽지 못해 마지막 내장 스냅샷을 표시하고 있습니다.";
+      }
+
+      function renderSummary(data) {
+        const overallPercent = getOverallPercent(data);
+        const completedMilestones = data.milestones.filter((item) => item.status === "completed").length;
+        const completedPackets = data.packets.filter((item) => item.status === "completed").length;
+
+        elements.pageTitle.textContent = `${data.meta.pageTitle}`;
+        elements.heroCopy.textContent = `${data.meta.currentSummary} 현재 포커스는 ${data.meta.currentFocus}입니다.`;
+        elements.currentState.textContent = data.summary.currentState;
+        elements.nextCheckpoint.textContent = data.summary.nextCheckpoint;
+        elements.completionRule.textContent = data.summary.completionRule;
+        elements.overallPercent.textContent = `${overallPercent}%`;
+        elements.overallBar.style.width = `${overallPercent}%`;
+        elements.phaseChip.textContent = data.meta.phaseLabel;
+        elements.updatedChip.textContent = `갱신 ${formatDate(data.meta.updatedAt)}`;
+        elements.milestoneCount.textContent = `${completedMilestones} / ${data.milestones.length}`;
+        elements.packetCount.textContent = `${completedPackets} / ${data.packets.length}`;
+        elements.focusChip.textContent = data.meta.currentFocus;
+        elements.footerNote.textContent = `${data.summary.completionText} 마지막 갱신 시각은 ${formatDate(data.meta.updatedAt)}입니다.`;
+      }
+
+      function renderMilestones(data) {
+        elements.milestoneGrid.innerHTML = data.milestones
+          .map((item) => {
+            const badge = statusMeta[item.status] || statusMeta.queued;
+            return `
+              <article class="milestone-card">
+                <div class="packet-top">
+                  <div>
+                    <div class="muted">${escapeHtml(item.id)} / ${escapeHtml(item.scope)}</div>
+                    <h3>${escapeHtml(item.name)}</h3>
+                  </div>
+                  <span class="chip ${badge.className}">${badge.label}</span>
+                </div>
+                <div class="milestone-meta">
+                  <span class="chip phase">가중치 ${escapeHtml(item.weight)}%</span>
+                  <span class="chip phase">진행률 ${escapeHtml(item.percent)}%</span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" style="width:${escapeHtml(item.percent)}%"></div></div>
+                <p class="packet-summary">${escapeHtml(item.focus)}</p>
+                <div class="detail-grid">
+                  <div class="mini-card">
+                    <h3>핵심 산출물</h3>
+                    ${renderList(item.deliverables)}
+                  </div>
+                  <div class="mini-card">
+                    <h3>다음 단계 조건</h3>
+                    ${renderList(item.exitCriteria)}
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      function renderLinks(data) {
+        elements.linksList.innerHTML = data.links
+          .map((item) => {
+            return `
+              <a class="link-card" href="${escapeHtml(item.href)}">
+                <span>${escapeHtml(item.label)}</span>
+                <span>${escapeHtml(item.href)}</span>
+              </a>
+            `;
+          })
+          .join("");
+      }
+
+      function populateMilestoneFilter(data) {
+        const currentValue = state.milestoneFilter;
+        const options = [`<option value="all">모든 마일스톤</option>`]
+          .concat(
+            data.milestones.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.id)} · ${escapeHtml(item.name)}</option>`)
+          )
+          .join("");
+
+        elements.milestoneFilter.innerHTML = options;
+        elements.milestoneFilter.value = currentValue;
+      }
+
+      function matchesPacketFilters(packet) {
+        const milestoneMatch = state.milestoneFilter === "all" || packet.milestoneId === state.milestoneFilter;
+        const statusMatch = state.statusFilter === "all" || packet.status === state.statusFilter;
+        const searchBase = [
+          packet.id,
+          packet.title,
+          packet.summary,
+          packet.nextAction,
+          ...(packet.tasks || []),
+          ...(packet.deliverables || [])
+        ]
+          .join(" ")
+          .toLowerCase();
+        const searchMatch = !state.searchFilter || searchBase.includes(state.searchFilter);
+        return milestoneMatch && statusMatch && searchMatch;
+      }
+
+      function renderPackets(data) {
+        const filteredPackets = data.packets.filter(matchesPacketFilters);
+
+        if (filteredPackets.length === 0) {
+          elements.packetList.innerHTML = `
+            <article class="packet-card">
+              <h3>조건에 맞는 작업 패킷이 없습니다</h3>
+              <p class="packet-summary">필터를 조정하거나 검색어를 지워 보세요.</p>
+            </article>
+          `;
+          return;
+        }
+
+        elements.packetList.innerHTML = filteredPackets
+          .map((packet) => {
+            const badge = statusMeta[packet.status] || statusMeta.queued;
+            const isOpen = packet.status === "active" || packet.status === "next" ? "open" : "";
+
+            return `
+              <details class="packet-card" ${isOpen}>
+                <summary>
+                  <div class="packet-top">
+                    <div>
+                      <div class="muted">${escapeHtml(packet.id)} / ${escapeHtml(packet.milestoneId)}</div>
+                      <h3>${escapeHtml(packet.title)}</h3>
+                      <p class="packet-summary">${escapeHtml(packet.summary)}</p>
+                    </div>
+                    <div class="stack">
+                      <span class="chip ${badge.className}">${badge.label}</span>
+                      <span class="chip phase">${escapeHtml(packet.percent)}%</span>
+                    </div>
+                  </div>
+                  <div class="packet-meta">
+                    <span class="chip phase">다음 작업: ${escapeHtml(packet.nextAction)}</span>
+                  </div>
+                  <div class="bar-track"><div class="bar-fill" style="width:${escapeHtml(packet.percent)}%"></div></div>
+                </summary>
+                <div class="detail-grid">
+                  <div class="mini-card">
+                    <h3>세부 작업</h3>
+                    ${renderList(packet.tasks)}
+                  </div>
+                  <div class="mini-card">
+                    <h3>핵심 산출물</h3>
+                    ${renderList(packet.deliverables)}
+                  </div>
+                  <div class="mini-card">
+                    <h3>완료 조건</h3>
+                    ${renderList(packet.doneCriteria)}
+                  </div>
+                  <div class="mini-card">
+                    <h3>검증 방법</h3>
+                    ${renderList(packet.verification)}
+                  </div>
+                  <div class="mini-card">
+                    <h3>선행 의존성</h3>
+                    ${renderList(packet.dependencies)}
+                  </div>
+                  <div class="mini-card">
+                    <h3>갱신 문서</h3>
+                    ${renderList(packet.docsToUpdate)}
+                  </div>
+                </div>
+              </details>
+            `;
+          })
+          .join("");
+      }
+
+      function renderStatusBoard(data) {
+        const items = [];
+        if (data.blockers && data.blockers.length > 0) {
+          data.blockers.forEach((item) => items.push({ className: "blocked", title: item.label, detail: item.detail }));
+        }
+
+        if (data.watchItems && data.watchItems.length > 0) {
+          data.watchItems.forEach((item) => items.push({ className: item.level || "info", title: item.label, detail: item.detail }));
+        }
+
+        if (items.length === 0) {
+          elements.statusBoard.innerHTML = `
+            <div class="status-item info">
+              <div class="activity-title">차단 항목 없음</div>
+              <div class="muted">현재 상태 스냅샷 기준으로 즉시 착수 불가능한 blocker는 없습니다.</div>
+            </div>
+          `;
+          return;
+        }
+
+        elements.statusBoard.innerHTML = items
+          .map((item) => {
+            return `
+              <div class="status-item ${escapeHtml(item.className)}">
+                <div class="activity-title">${escapeHtml(item.title)}</div>
+                <div class="muted">${escapeHtml(item.detail)}</div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function renderActivity(data) {
+        elements.activityStream.innerHTML = data.activityLog
+          .map((item) => {
+            const badge = statusMeta[item.status] || statusMeta.queued;
+            return `
+              <div class="activity-item">
+                <div class="activity-time">${escapeHtml(formatDate(item.time))}</div>
+                <div>
+                  <div class="stack">
+                    <span class="chip ${badge.className}">${badge.label}</span>
+                  </div>
+                  <div class="activity-title">${escapeHtml(item.title)}</div>
+                  <div class="muted">${escapeHtml(item.detail)}</div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function render(data) {
+        state.data = data;
+        renderSummary(data);
+        renderMilestones(data);
+        renderLinks(data);
+        populateMilestoneFilter(data);
+        renderPackets(data);
+        renderStatusBoard(data);
+        renderActivity(data);
+        setRefreshBanner();
+      }
+
+      async function loadProgressSnapshot() {
+        const liveCapable = location.protocol === "http:" || location.protocol === "https:";
+
+        if (!liveCapable) {
+          state.source = "embedded";
+          render(embeddedSnapshot);
+          return;
+        }
+
+        try {
+          const response = await fetch(`./progress.json?ts=${Date.now()}`, {
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error(`status ${response.status}`);
+          }
+
+          const data = await response.json();
+          state.source = "live";
+          render(data);
+        } catch (error) {
+          state.source = "embedded";
+          render(embeddedSnapshot);
+        }
+      }
+
+      function startAutoRefresh() {
+        if (state.timerId) {
+          clearInterval(state.timerId);
+        }
+
+        if (!state.autoRefresh) {
+          return;
+        }
+
+        if (!(location.protocol === "http:" || location.protocol === "https:")) {
+          return;
+        }
+
+        state.timerId = setInterval(() => {
+          loadProgressSnapshot();
+        }, state.intervalSeconds * 1000);
+      }
+
+      elements.autoRefreshToggle.addEventListener("change", () => {
+        state.autoRefresh = elements.autoRefreshToggle.checked;
+        startAutoRefresh();
+        setRefreshBanner();
+      });
+
+      elements.refreshInterval.addEventListener("change", () => {
+        state.intervalSeconds = Number(elements.refreshInterval.value);
+        startAutoRefresh();
+        setRefreshBanner();
+      });
+
+      elements.refreshNow.addEventListener("click", () => {
+        loadProgressSnapshot();
+      });
+
+      elements.milestoneFilter.addEventListener("change", () => {
+        state.milestoneFilter = elements.milestoneFilter.value;
+        renderPackets(state.data);
+      });
+
+      elements.statusFilter.addEventListener("change", () => {
+        state.statusFilter = elements.statusFilter.value;
+        renderPackets(state.data);
+      });
+
+      elements.searchFilter.addEventListener("input", () => {
+        state.searchFilter = elements.searchFilter.value.trim().toLowerCase();
+        renderPackets(state.data);
+      });
+
+      elements.refreshInterval.value = String(state.intervalSeconds);
+      elements.autoRefreshToggle.checked = state.autoRefresh;
+
+      loadProgressSnapshot();
+      startAutoRefresh();
+    </script>
+  </body>
+</html>

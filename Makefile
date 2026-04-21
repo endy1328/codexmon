@@ -1,0 +1,38 @@
+PYTHON ?= python3
+PYTHONPATH_VALUE ?= src
+
+.PHONY: help run doctor test check lint fmt
+
+help:
+	@echo "make run      - codexmon CLI 도움말"
+	@echo "make doctor   - 개발 기준선 점검 출력"
+	@echo "make test     - unittest 실행"
+	@echo "make check    - Python compile check"
+	@echo "make lint     - ruff check (설치된 경우)"
+	@echo "make fmt      - ruff format (설치된 경우)"
+
+run:
+	PYTHONPATH=$(PYTHONPATH_VALUE) $(PYTHON) -m codexmon --help
+
+doctor:
+	PYTHONPATH=$(PYTHONPATH_VALUE) $(PYTHON) -m codexmon doctor
+
+test:
+	$(PYTHON) -m unittest discover -s tests -v
+
+check:
+	PYTHONPATH=$(PYTHONPATH_VALUE) $(PYTHON) -m compileall src tests
+
+lint:
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff check src tests; \
+	else \
+		echo "ruff not installed"; \
+	fi
+
+fmt:
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff format src tests; \
+	else \
+		echo "ruff not installed"; \
+	fi
