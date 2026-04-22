@@ -3,23 +3,23 @@
     "projectName": "codexmon",
     "pageTitle": "구현 진행 모니터",
     "phaseLabel": "구현 진행 중",
-    "updatedAt": "2026-04-22T09:08:45+09:00",
-    "currentFocus": "M5 supervisor runtime baseline 완료",
-    "currentSummary": "M5가 완료됐고 synchronous supervisor runtime과 실제 task orchestration baseline이 들어갔다. 다음 작업은 background daemon/heartbeat runtime이다.",
-    "activeMilestoneId": "M5",
+    "updatedAt": "2026-04-22T19:21:02+09:00",
+    "currentFocus": "M6 daemon worker baseline 완료",
+    "currentSummary": "M6가 완료됐고 polling daemon worker와 runtime heartbeat persistence가 들어갔다. 다음 작업은 running state crash recovery와 service packaging이다.",
+    "activeMilestoneId": "M6",
     "activePacketId": "",
     "autoRefreshSeconds": 15
   },
   "summary": {
-    "currentState": "M5 완료",
-    "nextCheckpoint": "background daemon/heartbeat runtime 착수",
+    "currentState": "M6 완료",
+    "nextCheckpoint": "running state crash recovery 착수",
     "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
-    "completionText": "첫 구현 슬라이스와 synchronous supervisor runtime baseline이 닫혔다."
+    "completionText": "첫 구현 슬라이스, synchronous runtime, daemon worker baseline이 닫혔다."
   },
   "runtime": {
     "executionStatus": "idle",
-    "summary": "M5를 닫고 runtime baseline, CLI 진입점, validation 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스는 background runtime이다.",
-    "lastHeartbeatAt": "2026-04-22T09:08:45+09:00",
+    "summary": "M6를 닫고 daemon worker, runtime heartbeat, validation 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스는 crash recovery와 service packaging이다.",
+    "lastHeartbeatAt": "2026-04-22T19:21:02+09:00",
     "heartbeatGraceSeconds": 60,
     "activeAgents": [
       {
@@ -27,8 +27,8 @@
         "role": "메인 에이전트",
         "status": "idle",
         "task": "다음 구현 슬라이스 대기",
-        "detail": "M5 supervisor runtime baseline과 milestone push를 닫았고 다음 포커스는 background daemon/heartbeat runtime이다.",
-        "updatedAt": "2026-04-22T09:08:45+09:00",
+        "detail": "M6 daemon worker baseline과 milestone push를 닫았고 다음 포커스는 running state crash recovery와 service packaging이다.",
+        "updatedAt": "2026-04-22T19:21:02+09:00",
         "progress": 100
       }
     ]
@@ -57,6 +57,10 @@
     {
       "label": "M5 검증",
       "href": "../validation/m5-supervisor-runtime-validation.md"
+    },
+    {
+      "label": "M6 검증",
+      "href": "../validation/m6-daemon-runtime-validation.md"
     }
   ],
   "milestones": [
@@ -162,6 +166,24 @@
       "exitCriteria": [
         "단일 run이 supervisor runtime으로 completed 또는 awaiting_human까지 간다",
         "terminal state에서 repository lock이 해제된다"
+      ]
+    },
+    {
+      "id": "M6",
+      "name": "Daemon Worker Baseline",
+      "status": "completed",
+      "percent": 100,
+      "weight": 10,
+      "scope": "R2",
+      "focus": "polling daemon worker와 runtime heartbeat persistence가 완료됐다",
+      "deliverables": [
+        "daemon run-once / serve / status",
+        "runtime heartbeat persistence",
+        "async resume pickup"
+      ],
+      "exitCriteria": [
+        "background worker가 runnable run을 처리한다",
+        "approval 후 retry_pending run이 daemon에서 재개된다"
       ]
     }
   ],
@@ -466,9 +488,56 @@
         "agent-docs/validation/*",
         "docs/EXECUTION_PLAN.md"
       ]
+    },
+    {
+      "id": "R2",
+      "milestoneId": "M6",
+      "title": "Daemon Worker Baseline",
+      "status": "completed",
+      "percent": 100,
+      "summary": "runnable run을 background polling worker가 지속적으로 pickup하고 heartbeat를 남긴다.",
+      "nextAction": "완료",
+      "dependencies": [
+        "M5 완료"
+      ],
+      "deliverables": [
+        "daemon run-once / serve / status",
+        "runtime heartbeat persistence",
+        "async operator resume pickup"
+      ],
+      "tasks": [
+        "SQLite runtime heartbeat persistence 추가",
+        "runnable run 조회와 daemon 선택 정책 구현",
+        "daemon run-once, daemon serve, daemon status CLI 추가",
+        "approve 후 retry_pending run 재개 검증",
+        "daemon baseline validation 기록 추가"
+      ],
+      "doneCriteria": [
+        "background worker가 queued/retry_pending/pr_handoff run을 처리한다",
+        "heartbeat를 durable store에서 조회할 수 있다"
+      ],
+      "verification": [
+        "tests/test_daemon_runtime.py",
+        "tests/test_ledger.py",
+        "tests/test_cli.py",
+        "전체 unittest discover"
+      ],
+      "docsToUpdate": [
+        "README.md",
+        "agent.md",
+        "agent-docs/status/current-status.md",
+        "agent-docs/validation/*",
+        "docs/EXECUTION_PLAN.md"
+      ]
     }
   ],
   "activityLog": [
+    {
+      "time": "2026-04-22T19:21:02+09:00",
+      "status": "completed",
+      "title": "마일스톤 M6 완료",
+      "detail": "polling daemon worker, runtime heartbeat persistence, daemon CLI, async resume pickup baseline을 추가했다."
+    },
     {
       "time": "2026-04-22T09:08:45+09:00",
       "status": "completed",
@@ -590,14 +659,19 @@
       "detail": "runtime success path, approval gate path, CLI execute 위임, terminal lock release가 단위 테스트와 전체 회귀로 검증됐다."
     },
     {
+      "level": "info",
+      "label": "M6 검증 완료",
+      "detail": "daemon queued pickup, approval 후 resume pickup, runtime heartbeat persistence, daemon CLI가 단위 테스트와 전체 회귀로 검증됐다."
+    },
+    {
       "level": "watch",
       "label": "stdlib-first baseline",
       "detail": "pytest, ruff, uv는 아직 설치되지 않았고 현재는 unittest와 compile check를 사용한다."
     },
     {
       "level": "watch",
-      "label": "background runtime 미구현",
-      "detail": "background daemon/heartbeat runtime과 장기 실행 queue/worker 운영면은 아직 남아 있다."
+      "label": "crash recovery 미구현",
+      "detail": "running state crash recovery, 외부 service packaging, progress monitor DB 직접 연동은 아직 남아 있다."
     }
   ]
 }

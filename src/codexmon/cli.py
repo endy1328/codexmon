@@ -13,6 +13,7 @@ from codexmon import __version__
 from codexmon.approval_policy import ApprovalPolicyError, ApprovalPolicyService
 from codexmon.codex_adapter import CodexAdapter, CodexAdapterError
 from codexmon.config import Settings
+from codexmon.daemon_runtime import SupervisorDaemon
 from codexmon.failure_policy import FailurePolicyResult, FailurePolicySettings, FailureSignalController
 from codexmon.ledger import LedgerError, RecordNotFoundError, RunLedger
 from codexmon.orchestrator import OrchestratorError, SupervisorRuntime
@@ -62,6 +63,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="PR handoff 또는 runtime 완료 시 남길 residual risk note",
     )
     execute_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    daemon_parser = subparsers.add_parser("daemon", help="background runtime worker를 실행하거나 상태를 봅니다.")
+    daemon_subparsers = daemon_parser.add_subparsers(dest="daemon_command")
+    daemon_run_once_parser = daemon_subparsers.add_parser(
+        "run-once",
+        help="runnable run 하나를 선택해 한 번만 처리합니다.",
+    )
+    daemon_run_once_parser.add_argument("--chat-id", default="", help="알림에 사용할 Telegram chat ID")
+    daemon_run_once_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    daemon_serve_parser = daemon_subparsers.add_parser(
+        "serve",
+        help="polling loop로 background runtime worker를 실행합니다.",
+    )
+    daemon_serve_parser.add_argument("--chat-id", default="", help="알림에 사용할 Telegram chat ID")
+    daemon_serve_parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=0.0,
+        help="poll 간격 초 단위 override",
+    )
+    daemon_serve_parser.add_argument(
+        "--iterations",
+        type=int,
+        default=0,
+        help="0이면 무한 루프, 양수면 해당 횟수만큼 tick 합니다.",
+    )
+    daemon_serve_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    daemon_status_parser = daemon_subparsers.add_parser(
+        "status",
+        help="최근 daemon heartbeat를 조회합니다.",
+    )
+    daemon_status_parser.add_argument("--limit", type=int, default=20, help="heartbeat 조회 개수")
+    daemon_status_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
     status_parser = subparsers.add_parser("status", help="run ledger 상태를 조회합니다.")
     status_parser.add_argument("run_id", nargs="?", help="조회할 run ID")
     status_parser.add_argument("--limit", type=int, default=10, help="최근 run 조회 개수")
@@ -192,6 +225,8 @@ def command_doctor() -> int:
     print(f"github_api_base={settings.github_api_base}")
     print(f"github_base_branch={settings.github_base_branch}")
     print(f"local_check_command={settings.local_check_command or '<unset>'}")
+    print(f"daemon_worker_name={settings.daemon_worker_name}")
+    print(f"daemon_poll_interval_seconds={settings.daemon_poll_interval_seconds}")
     print(f"telegram_bot_token={'<set>' if settings.telegram_bot_token else '<unset>'}")
     print(f"telegram_api_base={settings.telegram_api_base}")
     print(f"telegram_chat_id={settings.telegram_chat_id or '<unset>'}")
@@ -243,6 +278,46 @@ def command_execute(args: argparse.Namespace) -> int:
     )
     _print_mapping(result, args.json)
     return 0 if result.final_state in {"completed", "awaiting_human"} else 1
+
+
+def command_daemon(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    daemon = build_supervisor_daemon(settings, ledger)
+
+    if args.daemon_command == "run-once":
+        result = daemon.run_once(chat_id=args.chat_id)
+        _print_mapping(result, args.json)
+        return 0 if result.ok else 1
+
+    if args.daemon_command == "serve":
+        result = daemon.serve(
+            chat_id=args.chat_id,
+            iterations=args.iterations,
+            poll_interval_seconds=args.poll_interval or None,
+        )
+        _print_mapping(result, args.json)
+        return 0
+
+    if args.daemon_command == "status":
+        items = daemon.status(limit=args.limit)
+        if args.json:
+            print(json.dumps([asdict(item) for item in items], ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            if not items:
+                print("no_heartbeats=true")
+                return 0
+            for item in items:
+                print(f"heartbeat_id={item.heartbeat_id}")
+                print(f"worker_name={item.worker_name}")
+                print(f"status={item.status}")
+                print(f"event_time={item.event_time}")
+                print(f"run_id={item.run_id or '<unset>'}")
+                print(f"payload={json.dumps(item.payload, ensure_ascii=False, sort_keys=True)}")
+                print()
+        return 0
+
+    raise OrchestratorError("daemon 하위 명령이 필요합니다.")
 
 
 def command_status(args: argparse.Namespace) -> int:
@@ -510,6 +585,16 @@ def build_supervisor_runtime(settings: Settings, ledger: RunLedger) -> Superviso
     )
 
 
+def build_supervisor_daemon(settings: Settings, ledger: RunLedger) -> SupervisorDaemon:
+    runtime = build_supervisor_runtime(settings, ledger)
+    return SupervisorDaemon(
+        ledger=ledger,
+        runtime=runtime,
+        worker_name=settings.daemon_worker_name,
+        poll_interval_seconds=settings.daemon_poll_interval_seconds,
+    )
+
+
 def command_handoff(args: argparse.Namespace) -> int:
     settings = Settings.from_env()
     ledger = RunLedger(settings.db_path)
@@ -562,6 +647,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_start(args)
         if args.command == "execute":
             return command_execute(args)
+        if args.command == "daemon":
+            return command_daemon(args)
         if args.command == "status":
             return command_status(args)
         if args.command == "stop":

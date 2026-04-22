@@ -27,6 +27,8 @@ class Settings:
     github_api_base: str
     github_base_branch: str
     local_check_command: str
+    daemon_worker_name: str
+    daemon_poll_interval_seconds: int
     telegram_bot_token: str
     telegram_api_base: str
     telegram_chat_id: str
@@ -52,6 +54,8 @@ class Settings:
             github_api_base=os.getenv("CODEXMON_GITHUB_API_BASE", "https://api.github.com"),
             github_base_branch=os.getenv("CODEXMON_GITHUB_BASE_BRANCH", "main"),
             local_check_command=os.getenv("CODEXMON_LOCAL_CHECK_COMMAND", ""),
+            daemon_worker_name=os.getenv("CODEXMON_DAEMON_WORKER_NAME", "codexmon-daemon"),
+            daemon_poll_interval_seconds=int(os.getenv("CODEXMON_DAEMON_POLL_INTERVAL_SECONDS", "15")),
             telegram_bot_token=os.getenv("CODEXMON_TELEGRAM_BOT_TOKEN", ""),
             telegram_api_base=os.getenv("CODEXMON_TELEGRAM_API_BASE", "https://api.telegram.org"),
             telegram_chat_id=os.getenv("CODEXMON_TELEGRAM_CHAT_ID", ""),

@@ -17,6 +17,8 @@ if str(SRC) not in sys.path:
 
 from codexmon import __version__
 from codexmon.cli import build_parser, main
+from codexmon.daemon_runtime import DaemonTickResult
+from codexmon.ledger import RunLedger
 from codexmon.orchestrator import OrchestrationResult
 
 
@@ -28,6 +30,7 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("doctor", help_text)
         self.assertIn("start", help_text)
         self.assertIn("execute", help_text)
+        self.assertIn("daemon", help_text)
         self.assertIn("status", help_text)
         self.assertIn("stop", help_text)
         self.assertIn("retry", help_text)
@@ -62,6 +65,8 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("github_api_base=", output)
         self.assertIn("github_base_branch=", output)
         self.assertIn("local_check_command=", output)
+        self.assertIn("daemon_worker_name=", output)
+        self.assertIn("daemon_poll_interval_seconds=", output)
         self.assertIn("telegram_bot_token=", output)
         self.assertIn("telegram_api_base=", output)
 
@@ -194,6 +199,55 @@ class CliTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         runtime.execute_run.assert_called_once()
         self.assertIn('"final_state": "awaiting_human"', buffer.getvalue())
+
+    def test_daemon_run_once_command_delegates_to_supervisor_daemon(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            daemon = mock.Mock()
+            daemon.run_once.return_value = DaemonTickResult(
+                worker_name="codexmon-daemon",
+                processed=True,
+                idle=False,
+                ok=True,
+                run_id="run_123",
+                final_state="completed",
+                outcome="PR opened",
+                error="",
+                heartbeat_status="completed",
+                heartbeat_id=7,
+            )
+            with mock.patch.dict(os.environ, env, clear=True):
+                buffer = StringIO()
+                with mock.patch("codexmon.cli.build_supervisor_daemon", return_value=daemon):
+                    with redirect_stdout(buffer):
+                        exit_code = main(["daemon", "run-once", "--json"])
+
+        self.assertEqual(exit_code, 0)
+        daemon.run_once.assert_called_once()
+        self.assertIn('"heartbeat_status": "completed"', buffer.getvalue())
+
+    def test_daemon_status_command_reads_heartbeats(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            ledger = RunLedger(db_path)
+            ledger.initialize()
+            ledger.record_runtime_heartbeat(
+                worker_name="codexmon-daemon",
+                status="idle",
+                payload={"runnable_runs": 0},
+            )
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            buffer = StringIO()
+            with mock.patch.dict(os.environ, env, clear=True):
+                with redirect_stdout(buffer):
+                    exit_code = main(["daemon", "status", "--limit", "1"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("worker_name=codexmon-daemon", buffer.getvalue())
+        self.assertIn("status=idle", buffer.getvalue())
 
 
 if __name__ == "__main__":

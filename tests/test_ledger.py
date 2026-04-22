@@ -151,6 +151,25 @@ class RunLedgerTestCase(unittest.TestCase):
         self.assertEqual(approvals_count, 1)
         self.assertEqual(pr_count, 1)
 
+    def test_runtime_heartbeat_and_runnable_run_queries_are_persisted(self) -> None:
+        task = self.ledger.create_task("daemon baseline")
+        queued_run = self.ledger.create_run(task.task_id)
+        second_run = self.ledger.create_run(task.task_id)
+        self.ledger.transition_run(second_run.run_id, "preflight", "accepted")
+
+        heartbeat = self.ledger.record_runtime_heartbeat(
+            worker_name="codexmon-daemon",
+            status="idle",
+            payload={"runnable_runs": 2},
+        )
+        runnable = self.ledger.list_runnable_runs(limit=5)
+        heartbeats = self.ledger.list_runtime_heartbeats(limit=5, worker_name="codexmon-daemon")
+
+        self.assertEqual(heartbeat.status, "idle")
+        self.assertEqual([item.run_id for item in runnable], [second_run.run_id, queued_run.run_id])
+        self.assertEqual(len(heartbeats), 1)
+        self.assertEqual(heartbeats[0].payload["runnable_runs"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

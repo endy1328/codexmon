@@ -25,9 +25,9 @@
 
 아직 시작하지 않은 것:
 
-- background daemon/heartbeat runtime
-- 장기 실행 queue/worker 운영면
-- async operator resume loop
+- running state crash recovery
+- 외부 process manager 연동과 service packaging
+- progress monitor의 DB 직접 연동
 
 ## 실행 원칙
 
@@ -73,7 +73,9 @@
 - 단계 C acceptance validation suite까지 완료됐다
 - 마일스톤 M5가 완료되면서 synchronous supervisor runtime, `start --execute`,
   `execute`, preflight gate, approval gate, lock release orchestration이 반영됐다
-- 다음 작업은 background daemon/heartbeat runtime 구현이다
+- 마일스톤 M6가 완료되면서 daemon worker, runtime heartbeat persistence,
+  async operator resume pickup, `daemon run-once/serve/status`가 반영됐다
+- 다음 작업은 running state crash recovery와 service packaging이다
 
 ## 구현 마일스톤 개요
 
@@ -87,6 +89,7 @@
 | M3 | 원격 감독 경로 | B6 | `Telegram` 알림과 원격 action round-trip | operator가 원격에서 상태 확인과 개입을 할 수 있다 |
 | M4 | 성공 경로 및 인수 | B7 + 단계 C | PR handoff, CI visibility, 종단 간 검증 기록 | 정본 데모 시나리오와 인수 체크리스트가 통과한다 |
 | M5 | Supervisor Runtime Baseline | R1 | synchronous orchestrator, preflight/runtime/handoff 연결 | `start --execute` 또는 `execute`로 단일 run을 끝까지 진행할 수 있다 |
+| M6 | Daemon Worker Baseline | R2 | polling daemon, runtime heartbeat, async resume pickup | background worker가 runnable run을 계속 처리할 수 있다 |
 
 ## 단계 B: 첫 구현 슬라이스 작업 패킷
 
@@ -155,6 +158,14 @@
 - 검증: runtime success path, approval gate path, CLI execute path
 - 현재 상태: 완료
 
+### 작업 패킷 R2: Daemon Worker Baseline
+
+- 목표: runnable run을 background polling worker가 지속적으로 처리하도록 만든다
+- 선행 의존성: 작업 패킷 R1
+- 산출물: runtime heartbeat persistence, `daemon run-once`, `daemon serve`, `daemon status`
+- 검증: daemon queued pickup, daemon resume pickup, heartbeat query, 전체 회귀
+- 현재 상태: 완료
+
 ## 마일스톤별 진행 방식
 
 ### 마일스톤 M0: 구현 진입 승인
@@ -178,7 +189,7 @@
 
 현재 상태:
 - 완료
-- 후속 구현은 background daemon/heartbeat runtime부터 이어진다
+- 후속 구현은 running state crash recovery, 외부 service packaging, progress monitor DB 직접 연동 순으로 이어진다
 
 ### 마일스톤 M1: 기반 레이어 구축
 
@@ -351,15 +362,44 @@
 - 완료
 - 검증 기록: `agent-docs/validation/m5-supervisor-runtime-validation.md`
 
+### 마일스톤 M6: Daemon Worker Baseline
+
+목표:
+- synchronous runtime 위에 background polling worker와 heartbeat persistence를 얹는다
+
+포함 범위:
+- 작업 패킷 R2
+
+세부 작업:
+- runtime heartbeat의 SQLite persistence 추가
+- runnable run 조회와 daemon worker 선택 정책 구현
+- `daemon run-once`, `daemon serve`, `daemon status` CLI 추가
+- operator `approve` 이후 `retry_pending` run의 비동기 pickup 반영
+- daemon baseline 검증 기록 추가
+
+핵심 산출물:
+- polling daemon worker
+- runtime heartbeat persistence
+- background worker CLI
+
+검증 포인트:
+- queued run이 daemon에서 pickup되어 `completed`까지 간다
+- approval 후 `retry_pending` run이 daemon에서 재개된다
+- heartbeat가 durable store에 남고 조회된다
+
+현재 상태:
+- 완료
+- 검증 기록: `agent-docs/validation/m6-daemon-runtime-validation.md`
+
 ## 단계 D: Runtime 확장
 
 목표:
-- 단일 프로세스 동기 runtime을 background heartbeat와 장기 실행 운영면으로 확장한다
+- current daemon baseline을 crash recovery와 운영 배포 가능한 형태로 확장한다
 
 필수 검증:
-- background heartbeat가 progress monitor와 durable event에 반영된다
-- operator 승인 후 재개가 별도 CLI 조합 없이 장기 실행 runtime 안에서 이어진다
-- terminal run과 paused run의 lock 정책이 운영 기준에 맞게 재검증된다
+- running state crash 후 orphaned run recovery가 가능하다
+- 외부 process manager 아래에서도 daemon 생명주기와 heartbeat가 일관된다
+- progress monitor가 static snapshot이 아니라 durable runtime state를 직접 읽는다
 
 종료 조건:
 - 터미널 세션에 붙어 있지 않아도 runtime이 지속되고 상태를 재구성할 수 있다
@@ -397,5 +437,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1, M2, M3, M4, M5는 완료됐다.
-다음 작업은 background daemon/heartbeat runtime과 장기 실행 운영면 구현이다.
+마일스톤 M1, M2, M3, M4, M5, M6는 완료됐다.
+다음 작업은 running state crash recovery, service packaging, progress monitor DB 연동이다.

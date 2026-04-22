@@ -34,13 +34,15 @@
 - 마일스톤 M4 완료
 - synchronous supervisor runtime baseline 완료
 - 마일스톤 M5 완료
+- daemon worker baseline 완료
+- 마일스톤 M6 완료
 - `README.md`, `agent.md`를 정본 문서 모델에 맞게 정렬
 
 ## 다음 운영 작업
 
-- background daemon/heartbeat runtime 설계 및 구현
-- 장기 실행 queue/worker 운영면 설계
-- operator 승인 후 자동 재개 loop 설계
+- running state crash recovery 설계 및 구현
+- 외부 process manager 연동과 service packaging 설계
+- progress monitor DB 직접 연동 설계
 
 ## 검증 누적
 
@@ -53,6 +55,7 @@
 - `agent-docs/validation/b7-pr-handoff-validation.md`
 - `agent-docs/validation/stage-c-acceptance-validation.md`
 - `agent-docs/validation/m5-supervisor-runtime-validation.md`
+- `agent-docs/validation/m6-daemon-runtime-validation.md`
 
 
 ## 이후로 미루는 항목

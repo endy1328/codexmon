@@ -3,8 +3,8 @@
 ## 목적
 
 이 저장소는 `구현 진행 중` 단계다. code-start gate, 첫 구현 슬라이스 `M4`,
-그리고 `M5` supervisor runtime baseline은 통과되었고, 에이전트는 정본 설계
-기준선을 유지하면서 다음 구현 슬라이스를 진행한다.
+`M5` supervisor runtime baseline, `M6` daemon worker baseline은 통과되었고,
+에이전트는 정본 설계 기준선을 유지하면서 다음 구현 슬라이스를 진행한다.
 
 ## 정본 원본
 
@@ -59,9 +59,10 @@
 - approval-required diff classification과 local approval scan 경로
 - GitHub PR handoff와 CI visibility persistence 경로
 - synchronous supervisor runtime과 실제 task orchestration baseline
+- SQLite runtime heartbeat persistence와 background daemon worker baseline
 - stdlib-first CLI와 `unittest` baseline
 - synthetic `start`, `status`, `stop`, `retry`, `approvals`, `workspace`, `runner`,
-  `telegram`, `handoff`, `doctor`, `version`, `execute` command 제공
+  `telegram`, `handoff`, `doctor`, `version`, `execute`, `daemon` command 제공
 - 단계 C acceptance validation suite와 인수 체크리스트 대응 검증 기록
 - 추가 개발 도구는 필요 시 점진적으로 도입
 
@@ -82,7 +83,7 @@
 
 ## 버전 및 Git 운영 규칙
 
-- 현재 개발 버전: `0.0.0.3`
+- 현재 개발 버전: `0.0.0.4`
 - 버전 형식: `major.major.minor.minor`
 - 왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다
 - 각 마일스톤이 완료되면 검증을 마친 뒤 Git commit과 `origin/main` push까지

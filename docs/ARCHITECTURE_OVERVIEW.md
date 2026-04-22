@@ -22,6 +22,7 @@
 - 첫 notifier는 `Telegram`
 - 첫 local control plane은 CLI
 - 첫 supervisor runtime은 synchronous single-run execution
+- 다음 runtime 확장은 local polling daemon worker
 - 첫 durable store는 로컬 `SQLite`
 - 첫 GitHub 범위는 PR 생성 + CI 가시화
 
@@ -42,6 +43,8 @@ auto-merge는 범위 밖이다.
    `status`, `stop`, `retry`, `approve`를 수신한다.
 8. run이 성공하면 GitHub handoff 경로가 PR을 생성하고 PR reference와
    CI visibility 상태를 기록한다.
+9. background daemon worker는 `queued`, `retry_pending`, `pr_handoff` run을
+   polling하고 heartbeat를 durable store에 남긴다.
 
 ## 컴포넌트 책임
 
@@ -113,6 +116,7 @@ v1의 GitHub 경계는 의도적으로 작다. 아래를 담당한다.
 - approvals
 - worktree 및 branch assignment
 - PR reference와 CI visibility snapshot
+- runtime heartbeat record
 
 event persistence는 append-oriented여야 한다. 현재 run state는 기록된
 event 및 transition history의 projection이지, 유일한 진실 원본이 아니다.

@@ -159,6 +159,19 @@ _MIGRATIONS: dict[int, str] = {
 
     CREATE INDEX IF NOT EXISTS idx_repository_locks_run_id ON repository_locks(run_id);
     """,
+    3: """
+    CREATE TABLE IF NOT EXISTS runtime_heartbeats (
+      heartbeat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      worker_name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      event_time TEXT NOT NULL,
+      run_id TEXT NOT NULL DEFAULT '',
+      payload_json TEXT NOT NULL DEFAULT '{}'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_heartbeats_worker_time
+      ON runtime_heartbeats(worker_name, event_time DESC, heartbeat_id DESC);
+    """,
 }
 SCHEMA_VERSION = max(_MIGRATIONS)
 
@@ -259,6 +272,16 @@ class ApprovalRecord:
     requested_by: str
     resolved_by: str
     decision_note: str
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RuntimeHeartbeatRecord:
+    heartbeat_id: int
+    worker_name: str
+    status: str
+    event_time: str
+    run_id: str
     payload: dict[str, Any]
 
 
@@ -1024,6 +1047,37 @@ class RunLedger:
             ).fetchall()
         return [self._row_to_projection(row) for row in rows]
 
+    def list_runnable_runs(self, limit: int = 10) -> list[RunProjection]:
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT runs.*, tasks.instruction_summary
+                FROM runs
+                JOIN tasks ON tasks.task_id = runs.task_id
+                WHERE runs.current_state IN (
+                  'pr_handoff',
+                  'retry_pending',
+                  'workspace_allocated',
+                  'preflight',
+                  'queued'
+                )
+                ORDER BY CASE runs.current_state
+                  WHEN 'pr_handoff' THEN 1
+                  WHEN 'retry_pending' THEN 2
+                  WHEN 'workspace_allocated' THEN 3
+                  WHEN 'preflight' THEN 4
+                  WHEN 'queued' THEN 5
+                  ELSE 99
+                END,
+                runs.updated_at ASC,
+                runs.created_at ASC
+                LIMIT ?
+                """,
+                (max(1, limit),),
+            ).fetchall()
+        return [self._row_to_projection(row) for row in rows]
+
     def list_events(self, run_id: str, limit: int = 200) -> list[EventRecord]:
         self.initialize()
         with self._connect() as conn:
@@ -1088,6 +1142,65 @@ class RunLedger:
                     (run_id, status),
                 ).fetchall()
         return [self._row_to_approval(row) for row in rows]
+
+    def record_runtime_heartbeat(
+        self,
+        worker_name: str,
+        status: str,
+        run_id: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeHeartbeatRecord:
+        self.initialize()
+        with self._connect() as conn:
+            now = _utc_now()
+            cursor = conn.execute(
+                """
+                INSERT INTO runtime_heartbeats(worker_name, status, event_time, run_id, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    worker_name,
+                    status,
+                    now,
+                    run_id,
+                    json.dumps(payload or {}, ensure_ascii=False, sort_keys=True),
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM runtime_heartbeats WHERE heartbeat_id = ?",
+                (cursor.lastrowid,),
+            ).fetchone()
+        return self._row_to_runtime_heartbeat(row)
+
+    def list_runtime_heartbeats(
+        self,
+        limit: int = 20,
+        worker_name: str = "",
+    ) -> list[RuntimeHeartbeatRecord]:
+        self.initialize()
+        with self._connect() as conn:
+            if worker_name:
+                rows = conn.execute(
+                    """
+                    SELECT *
+                    FROM runtime_heartbeats
+                    WHERE worker_name = ?
+                    ORDER BY heartbeat_id DESC
+                    LIMIT ?
+                    """,
+                    (worker_name, max(1, limit)),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT *
+                    FROM runtime_heartbeats
+                    ORDER BY heartbeat_id DESC
+                    LIMIT ?
+                    """,
+                    (max(1, limit),),
+                ).fetchall()
+        return [self._row_to_runtime_heartbeat(row) for row in rows]
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
@@ -1307,5 +1420,15 @@ class RunLedger:
             requested_by=row["requested_by"],
             resolved_by=row["resolved_by"],
             decision_note=row["decision_note"],
+            payload=json.loads(row["payload_json"] or "{}"),
+        )
+
+    def _row_to_runtime_heartbeat(self, row: sqlite3.Row) -> RuntimeHeartbeatRecord:
+        return RuntimeHeartbeatRecord(
+            heartbeat_id=int(row["heartbeat_id"]),
+            worker_name=row["worker_name"],
+            status=row["status"],
+            event_time=row["event_time"],
+            run_id=row["run_id"],
             payload=json.loads(row["payload_json"] or "{}"),
         )

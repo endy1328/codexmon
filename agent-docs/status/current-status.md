@@ -6,7 +6,7 @@
 
 `구현 진행 중`
 
-첫 구현 슬라이스, 마일스톤 `M4`, 그리고 `M5` supervisor runtime baseline은 완료됐다.
+첫 구현 슬라이스, 마일스톤 `M4`, `M5`, `M6`는 완료됐다.
 
 ## 완료
 
@@ -52,6 +52,10 @@
 - `start --execute`, `execute` CLI 경로와 preflight gate가 추가됐다
 - terminal state lock release와 approval gate orchestration이 추가됐다
 - 마일스톤 `M5`가 완료됐다
+- runtime heartbeat persistence와 runnable run 조회가 추가됐다
+- `daemon run-once`, `daemon serve`, `daemon status` background worker 경로가 추가됐다
+- operator approve 이후 `retry_pending` run의 비동기 pickup 검증이 추가됐다
+- 마일스톤 `M6`가 완료됐다
 
 ## 진행 중
 
@@ -59,14 +63,15 @@
 
 ## 대기 중
 
-- background daemon/heartbeat runtime
-- 장기 실행 queue/worker 운영면
-- async operator resume loop
+- running state crash recovery
+- 외부 process manager 연동과 service packaging
+- progress monitor의 DB 직접 연동
 
 ## 리스크 및 블로커
 
 - `pytest`, `ruff`, `uv`는 아직 설치되지 않았고 현재 baseline은 stdlib-first 기준이다
-- 장기 실행 daemon/heartbeat 운영면은 아직 없다
-- operator 승인 뒤 자동 재개를 background runtime 없이 계속 유지할 수는 없다
+- running state crash 뒤 orphaned run을 자동 복구하는 경로는 아직 없다
+- daemon lifecycle을 system service로 배포·관리하는 운영면은 아직 없다
+- progress monitor는 아직 static snapshot 기반이고 DB를 직접 읽지 않는다
 - 구현 단계는 runner, notifier, merge scope에 대한 고정 v1 결정을 다시 열지 않고
   진행해야 하며, 바꾸려면 명시적 재판단이 필요하다
