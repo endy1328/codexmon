@@ -54,6 +54,7 @@ class CodexAdapter:
         instruction: str,
         idle_timeout_seconds: float | None = None,
         wall_clock_timeout_seconds: float | None = None,
+        defer_success_transition: bool = False,
     ) -> CodexExecutionResult:
         run = self.ledger.get_run(run_id)
         assignment = self.ledger.get_workspace_assignment(run_id)
@@ -211,6 +212,22 @@ class CodexAdapter:
         timed_out = timeout_signal in {"idle_timeout", "wall_clock_timeout"}
 
         if exit_code == 0 and not timeout_signal:
+            if defer_success_transition:
+                final_run = self.ledger.get_run(run_id)
+                return CodexExecutionResult(
+                    run_id=run_id,
+                    workspace_path=str(workspace_path),
+                    branch_name=assignment.branch_name,
+                    command=command,
+                    launched=True,
+                    exit_code=exit_code,
+                    duration_seconds=duration_seconds,
+                    stdout_line_count=len(stdout_lines),
+                    stderr_line_count=len(stderr_lines),
+                    failure_signal="",
+                    timed_out=False,
+                    final_state=final_run.current_state,
+                )
             final_run = self.ledger.transition_run(
                 run_id,
                 "pr_handoff",

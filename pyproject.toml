@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codexmon"
-version = "0.0.0.2"
+version = "0.0.0.3"
 description = "Policy-first supervisor for unattended AI coding sessions."
 readme = "README.md"
 requires-python = ">=3.11"

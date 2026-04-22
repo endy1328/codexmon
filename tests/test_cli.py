@@ -17,6 +17,7 @@ if str(SRC) not in sys.path:
 
 from codexmon import __version__
 from codexmon.cli import build_parser, main
+from codexmon.orchestrator import OrchestrationResult
 
 
 class CliTestCase(unittest.TestCase):
@@ -26,6 +27,7 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("version", help_text)
         self.assertIn("doctor", help_text)
         self.assertIn("start", help_text)
+        self.assertIn("execute", help_text)
         self.assertIn("status", help_text)
         self.assertIn("stop", help_text)
         self.assertIn("retry", help_text)
@@ -90,6 +92,108 @@ class CliTestCase(unittest.TestCase):
         self.assertIn(f"run_id={run_id}", status_output)
         self.assertIn("current_state=queued", status_output)
         self.assertIn("instruction_summary=Synthetic status smoke test", status_output)
+
+    def test_execute_command_delegates_to_supervisor_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            with mock.patch.dict(os.environ, env, clear=True):
+                start_buffer = StringIO()
+                with redirect_stdout(start_buffer):
+                    self.assertEqual(main(["start", "Runtime delegate smoke test"]), 0)
+                run_id = next(
+                    line.split("=", 1)[1]
+                    for line in start_buffer.getvalue().splitlines()
+                    if line.startswith("run_id=")
+                )
+
+                fake_result = OrchestrationResult(
+                    run_id=run_id,
+                    task_id="task_123",
+                    final_state="completed",
+                    outcome="PR opened",
+                    state_reason="PR opened successfully",
+                    attempt_number=1,
+                    active_branch="codexmon/test",
+                    active_worktree="/tmp/codexmon/test",
+                    approval_required=False,
+                    approval_request_id="",
+                    pr_reference="github#17",
+                    retries_used=0,
+                    lock_released=True,
+                    notifications_sent=2,
+                )
+                runtime = mock.Mock()
+                runtime.execute_run.return_value = fake_result
+
+                buffer = StringIO()
+                with mock.patch("codexmon.cli.build_supervisor_runtime", return_value=runtime):
+                    with redirect_stdout(buffer):
+                        exit_code = main(["execute", run_id, "--json"])
+
+        self.assertEqual(exit_code, 0)
+        runtime.execute_run.assert_called_once()
+        self.assertIn('"final_state": "completed"', buffer.getvalue())
+
+    def test_start_execute_option_uses_supervisor_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            fake_result = OrchestrationResult(
+                run_id="",
+                task_id="task_123",
+                final_state="awaiting_human",
+                outcome="needs human decision",
+                state_reason="approval required: dependency-manifest-or-lockfile",
+                attempt_number=1,
+                active_branch="codexmon/test",
+                active_worktree="/tmp/codexmon/test",
+                approval_required=True,
+                approval_request_id="approval_123",
+                pr_reference="",
+                retries_used=0,
+                lock_released=False,
+                notifications_sent=2,
+            )
+            runtime = mock.Mock()
+
+            def _execute_run(run_id: str, instruction: str, residual_risk_note: str, chat_id: str) -> OrchestrationResult:
+                return OrchestrationResult(
+                    run_id=run_id,
+                    task_id=fake_result.task_id,
+                    final_state=fake_result.final_state,
+                    outcome=fake_result.outcome,
+                    state_reason=fake_result.state_reason,
+                    attempt_number=fake_result.attempt_number,
+                    active_branch=fake_result.active_branch,
+                    active_worktree=fake_result.active_worktree,
+                    approval_required=fake_result.approval_required,
+                    approval_request_id=fake_result.approval_request_id,
+                    pr_reference=fake_result.pr_reference,
+                    retries_used=fake_result.retries_used,
+                    lock_released=fake_result.lock_released,
+                    notifications_sent=fake_result.notifications_sent,
+                )
+
+            runtime.execute_run.side_effect = _execute_run
+            with mock.patch.dict(os.environ, env, clear=True):
+                buffer = StringIO()
+                with mock.patch("codexmon.cli.build_supervisor_runtime", return_value=runtime):
+                    with redirect_stdout(buffer):
+                        exit_code = main(
+                            [
+                                "start",
+                                "Runtime execute option",
+                                "--execute",
+                                "--json",
+                            ]
+                        )
+
+        self.assertEqual(exit_code, 0)
+        runtime.execute_run.assert_called_once()
+        self.assertIn('"final_state": "awaiting_human"', buffer.getvalue())
 
 
 if __name__ == "__main__":

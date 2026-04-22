@@ -5,7 +5,7 @@
 감지하며, 각 자율 실행을 아래 세 가지 명시적 결과 중 하나로 끝내는 것이
 목표다.
 
-현재 개발 버전은 `0.0.0.2`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
+현재 개발 버전은 `0.0.0.3`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
 왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다.
 
 - `PR opened`
@@ -14,8 +14,8 @@
 
 ## 현재 상태
 
-이 저장소는 이제 `구현 진행 중` 단계이며, 첫 구현 슬라이스와 마일스톤 `M4` 인수는
-완료됐다.
+이 저장소는 이제 `구현 진행 중` 단계이며, 첫 구현 슬라이스, 마일스톤 `M4`,
+그리고 `M5` supervisor runtime baseline이 완료됐다.
 
 현재 존재하는 것:
 - 정본 설계 문서 세트
@@ -34,13 +34,15 @@
 - GitHub PR handoff와 CI visibility persistence 경로
 - active runner interrupt 증거를 포함한 bounded halt 경로
 - 단계 C acceptance validation suite와 체크리스트 대응 검증 기록
+- synchronous supervisor runtime과 실제 task orchestration baseline
+- `start --execute`, `execute` CLI를 통한 end-to-end run orchestration
 - 최소 `start`, `status`, `stop`, `retry`, `approvals`, `workspace`, `runner`,
-  `telegram`, `handoff`, `doctor`, `version` CLI와 baseline test
+  `telegram`, `handoff`, `doctor`, `version`, `execute` CLI와 baseline test
 
 아직 존재하지 않는 것:
-- supervisor 핵심 런타임
-- 실제 task orchestration 구현
-- 장기 실행 daemon/heartbeat 운영면
+- background daemon/heartbeat runtime
+- 장기 실행 queue/worker 운영면
+- async operator resume loop
 
 ## 고정된 v1 결정
 
@@ -90,10 +92,10 @@ legible하며 recoverable하게 만드는 도구다.
 
 ## 다음 단계
 
-첫 구현 슬라이스는 단계 C acceptance validation suite까지 닫힌 상태다.
+첫 구현 슬라이스와 synchronous supervisor runtime baseline은 닫힌 상태다.
 다음 프로젝트 단계는 `docs/IMPLEMENTATION_SLICE.md`와
-`docs/EXECUTION_PLAN.md`를 기준으로 supervisor 핵심 런타임과 실제 task
-orchestration 구현으로 넘어가는 것이다.
+`docs/EXECUTION_PLAN.md`를 기준으로 background daemon/heartbeat runtime과
+장기 실행 운영면을 구현하는 것이다.
 
 ## 구현 기준선
 
@@ -109,6 +111,7 @@ orchestration 구현으로 넘어가는 것이다.
 - `Telegram` notifier와 `telegram notify/receive` 경로
 - 로컬 control plane `stop`, `retry`, `approvals`, `approvals scan` 경로
 - PR handoff가 적용된 `handoff` 경로
+- synchronous `start --execute`, `execute` runtime 경로
 - stage C acceptance validation suite와 인수 체크리스트 대응 검증
 - `unittest` 기반 테스트
 - `Makefile` 기반 기본 실행 명령
@@ -119,3 +122,4 @@ orchestration 구현으로 넘어가는 것이다.
 - `make doctor`
 - `make test`
 - `make check`
+- `PYTHONPATH=src python3 -m codexmon start "작업 요약" --execute`

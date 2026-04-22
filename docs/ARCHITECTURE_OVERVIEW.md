@@ -21,6 +21,7 @@
 - 첫 coding runner는 `Codex`
 - 첫 notifier는 `Telegram`
 - 첫 local control plane은 CLI
+- 첫 supervisor runtime은 synchronous single-run execution
 - 첫 durable store는 로컬 `SQLite`
 - 첫 GitHub 범위는 PR 생성 + CI 가시화
 
@@ -28,7 +29,7 @@ auto-merge는 범위 밖이다.
 
 ## 상위 런타임 흐름
 
-1. 로컬 CLI가 task 요청과 run record를 만든다.
+1. 로컬 CLI가 task 요청과 run record를 만들고, 필요하면 즉시 runtime 실행을 시작한다.
 2. orchestrator가 preflight 검증을 수행하고 repository execution
    lock을 획득한다.
 3. orchestrator가 전용 worktree와 branch를 할당한다.
@@ -36,7 +37,7 @@ auto-merge는 범위 밖이다.
 5. orchestrator가 run event, state transition, command summary,
    failure fingerprint를 `SQLite`에 저장한다.
 6. deterministic policy가 timeout, approval gate, 반복 failure fingerprint,
-   stop 요청을 평가한다.
+   stop 요청을 평가하고, 성공 경로에서는 PR handoff 직전 approval debt를 확인한다.
 7. `Telegram` notifier가 상태 변화를 알리고, 제한된 원격 동작
    `status`, `stop`, `retry`, `approve`를 수신한다.
 8. run이 성공하면 GitHub handoff 경로가 PR을 생성하고 PR reference와
@@ -186,6 +187,7 @@ AI는 아래를 소유하지 않는다.
 v1 CLI는 아래 동사를 지원해야 한다.
 
 - `start`
+- `execute`
 - `status`
 - `stop`
 - `retry`

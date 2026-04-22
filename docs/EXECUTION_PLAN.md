@@ -1,6 +1,6 @@
 # 실행 계획
 
-날짜: 2026-04-21
+날짜: 2026-04-22
 상태: 구현 진행 중
 
 ## 이 문서의 역할
@@ -25,8 +25,9 @@
 
 아직 시작하지 않은 것:
 
-- supervisor 핵심 런타임 구현
-- 실제 task orchestration 구현
+- background daemon/heartbeat runtime
+- 장기 실행 queue/worker 운영면
+- async operator resume loop
 
 ## 실행 원칙
 
@@ -70,7 +71,9 @@
 - 작업 패킷 B7이 완료되면서 local check bundle, branch push, GitHub PR 생성,
   CI visibility persistence, synthetic `handoff` CLI 경로가 반영됐다
 - 단계 C acceptance validation suite까지 완료됐다
-- 다음 작업은 supervisor 핵심 런타임 구현이다
+- 마일스톤 M5가 완료되면서 synchronous supervisor runtime, `start --execute`,
+  `execute`, preflight gate, approval gate, lock release orchestration이 반영됐다
+- 다음 작업은 background daemon/heartbeat runtime 구현이다
 
 ## 구현 마일스톤 개요
 
@@ -83,6 +86,7 @@
 | M2 | 실행 및 실패 통제 | B4-B5 | `Codex` adapter, timeout/fingerprint/retry 경로 | 성공/실패/정지 신호가 deterministic하게 기록된다 |
 | M3 | 원격 감독 경로 | B6 | `Telegram` 알림과 원격 action round-trip | operator가 원격에서 상태 확인과 개입을 할 수 있다 |
 | M4 | 성공 경로 및 인수 | B7 + 단계 C | PR handoff, CI visibility, 종단 간 검증 기록 | 정본 데모 시나리오와 인수 체크리스트가 통과한다 |
+| M5 | Supervisor Runtime Baseline | R1 | synchronous orchestrator, preflight/runtime/handoff 연결 | `start --execute` 또는 `execute`로 단일 run을 끝까지 진행할 수 있다 |
 
 ## 단계 B: 첫 구현 슬라이스 작업 패킷
 
@@ -143,6 +147,14 @@
 - 검증: controlled success-path run과 persisted PR reference
 - 현재 상태: 완료
 
+### 작업 패킷 R1: Supervisor Runtime Baseline
+
+- 목표: 기존 서비스 조각을 실제 단일-run supervisor 흐름으로 묶는다
+- 선행 의존성: 작업 패킷 B7과 단계 C
+- 산출물: synchronous orchestrator, `start --execute`, `execute`, terminal lock release
+- 검증: runtime success path, approval gate path, CLI execute path
+- 현재 상태: 완료
+
 ## 마일스톤별 진행 방식
 
 ### 마일스톤 M0: 구현 진입 승인
@@ -166,7 +178,7 @@
 
 현재 상태:
 - 완료
-- 후속 구현은 supervisor 핵심 런타임 구현부터 이어진다
+- 후속 구현은 background daemon/heartbeat runtime부터 이어진다
 
 ### 마일스톤 M1: 기반 레이어 구축
 
@@ -310,6 +322,48 @@
 - 완료
 - 단계 C acceptance validation suite와 인수 체크리스트 대응 검증이 반영됐다
 
+### 마일스톤 M5: Supervisor Runtime Baseline
+
+목표:
+- 이미 구현된 서비스 조각을 실제 단일-run supervisor 흐름으로 묶는다
+
+포함 범위:
+- 작업 패킷 R1
+
+세부 작업:
+- queued run의 preflight 시작과 필수 설정 검증
+- workspace allocation, failure policy, approval gate, PR handoff의 단일 실행 흐름 연결
+- terminal state에서 deterministic lock release 반영
+- `start --execute`와 `execute` CLI 진입점 추가
+- runtime baseline 검증 기록 추가
+
+핵심 산출물:
+- synchronous supervisor runtime
+- 실제 task orchestration baseline
+- runtime validation 기록
+
+검증 포인트:
+- 성공 경로가 `start --execute` 또는 `execute`로 `completed`까지 간다
+- risky diff 성공 경로가 `awaiting_human`으로 분기한다
+- terminal state에서 repository lock이 해제된다
+
+현재 상태:
+- 완료
+- 검증 기록: `agent-docs/validation/m5-supervisor-runtime-validation.md`
+
+## 단계 D: Runtime 확장
+
+목표:
+- 단일 프로세스 동기 runtime을 background heartbeat와 장기 실행 운영면으로 확장한다
+
+필수 검증:
+- background heartbeat가 progress monitor와 durable event에 반영된다
+- operator 승인 후 재개가 별도 CLI 조합 없이 장기 실행 runtime 안에서 이어진다
+- terminal run과 paused run의 lock 정책이 운영 기준에 맞게 재검증된다
+
+종료 조건:
+- 터미널 세션에 붙어 있지 않아도 runtime이 지속되고 상태를 재구성할 수 있다
+
 ## 단계 C: 종단 간 인수
 
 목표:
@@ -343,5 +397,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1, M2, M3, M4는 완료됐다.
-다음 작업은 supervisor 핵심 런타임과 실제 task orchestration 구현이다.
+마일스톤 M1, M2, M3, M4, M5는 완료됐다.
+다음 작업은 background daemon/heartbeat runtime과 장기 실행 운영면 구현이다.

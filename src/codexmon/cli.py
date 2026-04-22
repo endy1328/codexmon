@@ -15,6 +15,7 @@ from codexmon.codex_adapter import CodexAdapter, CodexAdapterError
 from codexmon.config import Settings
 from codexmon.failure_policy import FailurePolicyResult, FailurePolicySettings, FailureSignalController
 from codexmon.ledger import LedgerError, RecordNotFoundError, RunLedger
+from codexmon.orchestrator import OrchestratorError, SupervisorRuntime
 from codexmon.pr_handoff import GitHubApiClient, PRHandoffError, PRHandoffService
 from codexmon.telegram_notifier import (
     TelegramBotApiTransport,
@@ -39,7 +40,28 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser.add_argument("--run-id", help="run 식별자를 직접 지정합니다.")
     start_parser.add_argument("--repo-owner", help="task가 속한 GitHub owner")
     start_parser.add_argument("--repo-name", help="task가 속한 GitHub repository")
+    start_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="run record 생성 직후 supervisor runtime으로 끝까지 실행합니다.",
+    )
+    start_parser.add_argument("--chat-id", default="", help="runtime 알림에 사용할 Telegram chat ID")
+    start_parser.add_argument(
+        "--residual-risk-note",
+        default="",
+        help="PR handoff 또는 runtime 완료 시 남길 residual risk note",
+    )
     start_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    execute_parser = subparsers.add_parser("execute", help="기존 run을 supervisor runtime으로 재개합니다.")
+    execute_parser.add_argument("run_id", help="실행 또는 재개할 run ID")
+    execute_parser.add_argument("--instruction", default="", help="run instruction override")
+    execute_parser.add_argument("--chat-id", default="", help="runtime 알림에 사용할 Telegram chat ID")
+    execute_parser.add_argument(
+        "--residual-risk-note",
+        default="",
+        help="PR handoff 또는 runtime 완료 시 남길 residual risk note",
+    )
+    execute_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
     status_parser = subparsers.add_parser("status", help="run ledger 상태를 조회합니다.")
     status_parser.add_argument("run_id", nargs="?", help="조회할 run ID")
     status_parser.add_argument("--limit", type=int, default=10, help="최근 run 조회 개수")
@@ -192,11 +214,35 @@ def command_start(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         instruction_summary=args.instruction_summary,
     )
+    if args.execute:
+        runtime = build_supervisor_runtime(settings, ledger)
+        result = runtime.execute_run(
+            run_id=run.run_id,
+            instruction=args.instruction_summary,
+            residual_risk_note=args.residual_risk_note,
+            chat_id=args.chat_id,
+        )
+        _print_mapping(result, args.json)
+        return 0 if result.final_state in {"completed", "awaiting_human"} else 1
     if args.json:
         print(json.dumps(asdict(run), ensure_ascii=False, indent=2, sort_keys=True))
         return 0
     print_run_projection(run)
     return 0
+
+
+def command_execute(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    runtime = build_supervisor_runtime(settings, ledger)
+    result = runtime.execute_run(
+        run_id=args.run_id,
+        instruction=args.instruction,
+        residual_risk_note=args.residual_risk_note,
+        chat_id=args.chat_id,
+    )
+    _print_mapping(result, args.json)
+    return 0 if result.final_state in {"completed", "awaiting_human"} else 1
 
 
 def command_status(args: argparse.Namespace) -> int:
@@ -427,6 +473,43 @@ def build_pr_handoff_service(settings: Settings, ledger: RunLedger) -> PRHandoff
     )
 
 
+def build_supervisor_runtime(settings: Settings, ledger: RunLedger) -> SupervisorRuntime:
+    allocator = WorktreeAllocator(
+        ledger=ledger,
+        repo_path=settings.repo_path,
+        worktree_root=settings.worktree_root,
+    )
+    adapter = CodexAdapter(
+        ledger=ledger,
+        codex_command=settings.codex_command,
+        model=settings.codex_model,
+        sandbox_mode=settings.codex_sandbox,
+    )
+    failure_controller = FailureSignalController(
+        ledger=ledger,
+        adapter=adapter,
+        settings=FailurePolicySettings(
+            automatic_retry_budget=settings.automatic_retry_budget,
+            idle_timeout_seconds=settings.idle_timeout_seconds,
+            wall_clock_timeout_seconds=settings.wall_clock_timeout_seconds,
+        ),
+    )
+    approval_policy = ApprovalPolicyService(
+        ledger=ledger,
+        default_base_branch=settings.github_base_branch,
+    )
+    notifier = build_telegram_notifier(settings, ledger)
+    handoff_service = build_pr_handoff_service(settings, ledger)
+    return SupervisorRuntime(
+        ledger=ledger,
+        allocator=allocator,
+        failure_controller=failure_controller,
+        approval_policy=approval_policy,
+        handoff_service=handoff_service,
+        notifier=notifier,
+    )
+
+
 def command_handoff(args: argparse.Namespace) -> int:
     settings = Settings.from_env()
     ledger = RunLedger(settings.db_path)
@@ -477,6 +560,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_doctor()
         if args.command == "start":
             return command_start(args)
+        if args.command == "execute":
+            return command_execute(args)
         if args.command == "status":
             return command_status(args)
         if args.command == "stop":
@@ -499,6 +584,7 @@ def main(argv: list[str] | None = None) -> int:
         WorkspaceError,
         CodexAdapterError,
         ApprovalPolicyError,
+        OrchestratorError,
         TelegramNotifierError,
         PRHandoffError,
     ) as exc:

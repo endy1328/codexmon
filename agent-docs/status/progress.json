@@ -3,23 +3,23 @@
     "projectName": "codexmon",
     "pageTitle": "구현 진행 모니터",
     "phaseLabel": "구현 진행 중",
-    "updatedAt": "2026-04-21T21:24:30+09:00",
-    "currentFocus": "첫 구현 슬라이스 완료",
-    "currentSummary": "M4와 단계 C acceptance validation suite가 완료됐다. 다음 작업은 supervisor 핵심 런타임이다.",
-    "activeMilestoneId": "M4",
+    "updatedAt": "2026-04-22T09:08:45+09:00",
+    "currentFocus": "M5 supervisor runtime baseline 완료",
+    "currentSummary": "M5가 완료됐고 synchronous supervisor runtime과 실제 task orchestration baseline이 들어갔다. 다음 작업은 background daemon/heartbeat runtime이다.",
+    "activeMilestoneId": "M5",
     "activePacketId": "",
     "autoRefreshSeconds": 15
   },
   "summary": {
-    "currentState": "M4 완료",
-    "nextCheckpoint": "supervisor 핵심 런타임 착수",
+    "currentState": "M5 완료",
+    "nextCheckpoint": "background daemon/heartbeat runtime 착수",
     "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
-    "completionText": "첫 구현 슬라이스와 private demo acceptance suite가 닫혔다."
+    "completionText": "첫 구현 슬라이스와 synchronous supervisor runtime baseline이 닫혔다."
   },
   "runtime": {
     "executionStatus": "idle",
-    "summary": "M4를 닫고 milestone 기준 문서, 검증 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스를 대기 중이다.",
-    "lastHeartbeatAt": "2026-04-21T21:24:30+09:00",
+    "summary": "M5를 닫고 runtime baseline, CLI 진입점, validation 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스는 background runtime이다.",
+    "lastHeartbeatAt": "2026-04-22T09:08:45+09:00",
     "heartbeatGraceSeconds": 60,
     "activeAgents": [
       {
@@ -27,8 +27,8 @@
         "role": "메인 에이전트",
         "status": "idle",
         "task": "다음 구현 슬라이스 대기",
-        "detail": "M4 acceptance suite와 milestone push를 닫았고 다음 포커스는 supervisor 핵심 런타임이다.",
-        "updatedAt": "2026-04-21T21:24:30+09:00",
+        "detail": "M5 supervisor runtime baseline과 milestone push를 닫았고 다음 포커스는 background daemon/heartbeat runtime이다.",
+        "updatedAt": "2026-04-22T09:08:45+09:00",
         "progress": 100
       }
     ]
@@ -53,6 +53,10 @@
     {
       "label": "단계 C 인수 검증",
       "href": "../validation/stage-c-acceptance-validation.md"
+    },
+    {
+      "label": "M5 검증",
+      "href": "../validation/m5-supervisor-runtime-validation.md"
     }
   ],
   "milestones": [
@@ -140,6 +144,24 @@
       "exitCriteria": [
         "실제 PR reference가 남는다",
         "인수 체크리스트 전체가 증거와 함께 검증된다"
+      ]
+    },
+    {
+      "id": "M5",
+      "name": "Supervisor Runtime Baseline",
+      "status": "completed",
+      "percent": 100,
+      "weight": 15,
+      "scope": "R1",
+      "focus": "synchronous supervisor runtime과 실제 task orchestration baseline이 완료됐다",
+      "deliverables": [
+        "preflight/runtime/handoff orchestration",
+        "start --execute / execute CLI",
+        "terminal lock release"
+      ],
+      "exitCriteria": [
+        "단일 run이 supervisor runtime으로 completed 또는 awaiting_human까지 간다",
+        "terminal state에서 repository lock이 해제된다"
       ]
     }
   ],
@@ -404,9 +426,55 @@
         "agent-docs/validation/*",
         "README.md"
       ]
+    },
+    {
+      "id": "R1",
+      "milestoneId": "M5",
+      "title": "Supervisor Runtime Baseline",
+      "status": "completed",
+      "percent": 100,
+      "summary": "기존 서비스 조각을 단일 supervisor runtime으로 묶어 실제 task orchestration을 제공한다.",
+      "nextAction": "완료",
+      "dependencies": [
+        "M4 완료"
+      ],
+      "deliverables": [
+        "synchronous orchestrator",
+        "preflight gate",
+        "start --execute / execute CLI"
+      ],
+      "tasks": [
+        "preflight check와 workspace allocation 연결",
+        "failure policy, approval gate, PR handoff를 단일 runtime 흐름으로 결합",
+        "terminal state lock release 반영",
+        "start --execute 와 execute CLI 추가",
+        "runtime baseline 테스트와 validation 기록 추가"
+      ],
+      "doneCriteria": [
+        "단일 run이 end-to-end orchestration을 지난다",
+        "risky success diff가 awaiting_human으로 분기한다"
+      ],
+      "verification": [
+        "tests/test_orchestrator.py",
+        "tests/test_cli.py",
+        "전체 unittest discover"
+      ],
+      "docsToUpdate": [
+        "README.md",
+        "agent.md",
+        "agent-docs/status/current-status.md",
+        "agent-docs/validation/*",
+        "docs/EXECUTION_PLAN.md"
+      ]
     }
   ],
   "activityLog": [
+    {
+      "time": "2026-04-22T09:08:45+09:00",
+      "status": "completed",
+      "title": "마일스톤 M5 완료",
+      "detail": "synchronous supervisor runtime, start --execute / execute CLI, preflight gate, approval gate orchestration, terminal lock release를 추가했다."
+    },
     {
       "time": "2026-04-21T21:24:30+09:00",
       "status": "completed",
@@ -517,14 +585,19 @@
       "detail": "acceptance validation suite가 성공, 실패 제어, 사람 개입, bounded halt 경로를 종단 간으로 검증했다."
     },
     {
+      "level": "info",
+      "label": "M5 검증 완료",
+      "detail": "runtime success path, approval gate path, CLI execute 위임, terminal lock release가 단위 테스트와 전체 회귀로 검증됐다."
+    },
+    {
       "level": "watch",
       "label": "stdlib-first baseline",
       "detail": "pytest, ruff, uv는 아직 설치되지 않았고 현재는 unittest와 compile check를 사용한다."
     },
     {
       "level": "watch",
-      "label": "다음 슬라이스 미시작",
-      "detail": "supervisor 핵심 런타임과 실제 task orchestration 구현은 아직 착수 전이다."
+      "label": "background runtime 미구현",
+      "detail": "background daemon/heartbeat runtime과 장기 실행 queue/worker 운영면은 아직 남아 있다."
     }
   ]
 }

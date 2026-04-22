@@ -778,26 +778,26 @@
           "projectName": "codexmon",
           "pageTitle": "구현 진행 모니터",
           "phaseLabel": "구현 진행 중",
-          "updatedAt": "2026-04-21T21:24:30+09:00",
-          "currentFocus": "첫 구현 슬라이스 완료",
-          "currentSummary": "M4와 단계 C acceptance validation suite가 완료됐다. 다음 작업은 supervisor 핵심 런타임이다.",
-          "activeMilestoneId": "M4",
+          "updatedAt": "2026-04-22T09:08:45+09:00",
+          "currentFocus": "M5 supervisor runtime baseline 완료",
+          "currentSummary": "M5가 완료됐고 synchronous supervisor runtime과 실제 task orchestration baseline이 들어갔다. 다음 작업은 background daemon/heartbeat runtime이다.",
+          "activeMilestoneId": "M5",
           "activePacketId": "",
           "autoRefreshSeconds": 15
         },
         "summary": {
-          "currentState": "M4 완료",
-          "nextCheckpoint": "supervisor 핵심 런타임 착수",
+          "currentState": "M5 완료",
+          "nextCheckpoint": "background daemon/heartbeat runtime 착수",
           "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
-          "completionText": "첫 구현 슬라이스와 private demo acceptance suite가 닫혔다."
+          "completionText": "첫 구현 슬라이스와 synchronous supervisor runtime baseline이 닫혔다."
         },
         "runtime": {
           "executionStatus": "idle",
-          "summary": "M4를 닫고 milestone 기준 문서, 검증 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스를 대기 중이다.",
-          "lastHeartbeatAt": "2026-04-21T21:24:30+09:00",
+          "summary": "M5를 닫고 runtime baseline, CLI 진입점, validation 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스는 background runtime이다.",
+          "lastHeartbeatAt": "2026-04-22T09:08:45+09:00",
           "heartbeatGraceSeconds": 60,
           "activeAgents": [
-            { "name": "Codex", "role": "메인 에이전트", "status": "idle", "task": "다음 구현 슬라이스 대기", "detail": "M4 acceptance suite와 milestone push를 닫았고 다음 포커스는 supervisor 핵심 런타임이다.", "updatedAt": "2026-04-21T21:24:30+09:00", "progress": 100 }
+            { "name": "Codex", "role": "메인 에이전트", "status": "idle", "task": "다음 구현 슬라이스 대기", "detail": "M5 supervisor runtime baseline과 milestone push를 닫았고 다음 포커스는 background daemon/heartbeat runtime이다.", "updatedAt": "2026-04-22T09:08:45+09:00", "progress": 100 }
           ]
         },
         "links": [
@@ -805,14 +805,16 @@
           { "label": "구현 슬라이스", "href": "../../docs/IMPLEMENTATION_SLICE.md" },
           { "label": "현재 상태 기록", "href": "./current-status.md" },
           { "label": "Code-Start Gate 검증", "href": "../validation/code-start-gate-validation.md" },
-          { "label": "단계 C 인수 검증", "href": "../validation/stage-c-acceptance-validation.md" }
+          { "label": "단계 C 인수 검증", "href": "../validation/stage-c-acceptance-validation.md" },
+          { "label": "M5 검증", "href": "../validation/m5-supervisor-runtime-validation.md" }
         ],
         "milestones": [
           { "id": "M0", "name": "구현 진입 승인", "status": "completed", "percent": 100, "weight": 10, "scope": "code-start gate", "focus": "구현 시작 승인 완료", "deliverables": ["code-start gate 통과 기록", "구현 시작 기준 상태 스냅샷"], "exitCriteria": ["작업 패킷 B1을 설계 재개 없이 시작할 수 있다", "Git 미초기화 상태가 B1 범위로 정리됐다"] },
           { "id": "M1", "name": "기반 레이어 구축", "status": "completed", "percent": 100, "weight": 30, "scope": "B1-B3", "focus": "run ledger와 repository lock/worktree allocator가 완료됐다", "deliverables": ["구현 가능한 저장소 기준선", "SQLite 기반 run ledger", "repository lock 및 worktree allocator"], "exitCriteria": ["runner 없이도 run 생성과 상태 전이가 가능하다", "두 번째 autonomous run이 lock 때문에 거부된다"] },
           { "id": "M2", "name": "실행 및 실패 통제", "status": "completed", "percent": 100, "weight": 25, "scope": "B4-B5", "focus": "Codex adapter와 failure signal path가 완료됐다", "deliverables": ["Codex adapter", "timeout, fingerprint, retry 정책 실행 경로"], "exitCriteria": ["launch, output, exit event가 저장된다", "duplicate fingerprint halt와 automatic retry budget이 동작한다"] },
           { "id": "M3", "name": "원격 감독 경로", "status": "completed", "percent": 100, "weight": 15, "scope": "B6", "focus": "Telegram 알림과 remote action round-trip이 완료됐다", "deliverables": ["outbound Telegram 알림", "status/stop/retry/approve inbound action 경로"], "exitCriteria": ["상태 변화가 Telegram으로 전달된다", "remote action이 유효한 state transition으로 이어진다"] },
-          { "id": "M4", "name": "성공 경로 및 인수 완료", "status": "completed", "percent": 100, "weight": 20, "scope": "B7 + 종단 간 인수", "focus": "PR handoff와 단계 C acceptance validation suite가 완료됐다", "deliverables": ["PR handoff success path", "종단 간 검증 기록"], "exitCriteria": ["실제 PR reference가 남는다", "인수 체크리스트 전체가 증거와 함께 검증된다"] }
+          { "id": "M4", "name": "성공 경로 및 인수 완료", "status": "completed", "percent": 100, "weight": 20, "scope": "B7 + 종단 간 인수", "focus": "PR handoff와 단계 C acceptance validation suite가 완료됐다", "deliverables": ["PR handoff success path", "종단 간 검증 기록"], "exitCriteria": ["실제 PR reference가 남는다", "인수 체크리스트 전체가 증거와 함께 검증된다"] },
+          { "id": "M5", "name": "Supervisor Runtime Baseline", "status": "completed", "percent": 100, "weight": 15, "scope": "R1", "focus": "synchronous supervisor runtime과 실제 task orchestration baseline이 완료됐다", "deliverables": ["preflight/runtime/handoff orchestration", "start --execute / execute CLI", "terminal lock release"], "exitCriteria": ["단일 run이 supervisor runtime으로 completed 또는 awaiting_human까지 간다", "terminal state에서 repository lock이 해제된다"] }
         ],
         "packets": [
           { "id": "B1", "milestoneId": "M1", "title": "Repository 초기화와 개발 기준선", "status": "completed", "percent": 100, "summary": "저장소를 실제 구현이 가능한 기본 상태로 만든다.", "nextAction": "완료", "dependencies": ["M0 통과"], "deliverables": ["구현 가능 저장소 기준선", "프로젝트 루트 구조", "개발 규약"], "tasks": ["Git repository 초기화", "기본 branch 규약 및 .gitignore 기준선 확정", "프로젝트 루트 구조와 모듈 경계 생성", "애플리케이션 언어와 패키지 관리자 확정", "테스트, lint, format 실행 기본선 확정", "로컬 개발 환경 변수/설정 파일 템플릿 작성"], "doneCriteria": ["저장소가 첫 구현 슬라이스를 수용할 준비가 됐다", "기본 개발 규약과 실행 경로가 정해졌다"], "verification": ["code-start checklist 통과 여부 확인", "repository baseline 검토"], "docsToUpdate": ["README.md", "agent.md", "agent-docs/status/current-status.md", "agent-docs/validation/*", "docs/EXECUTION_PLAN.md"] },
@@ -821,9 +823,11 @@
           { "id": "B4", "milestoneId": "M2", "title": "Codex Adapter", "status": "completed", "percent": 100, "summary": "첫 지원 runner를 실행하고 lifecycle을 관찰한다.", "nextAction": "완료", "dependencies": ["B3 완료"], "deliverables": ["Codex 실행 wrapper", "stdout/stderr/exit signal capture", "structured adapter event"], "tasks": ["Codex 실행 wrapper 구현", "task instruction과 run metadata 주입 방식 구현", "stdout/stderr/exit signal capture 구현", "adapter event normalization 구현", "launch 실패와 즉시 종료 케이스 처리"], "doneCriteria": ["Codex가 run workspace에서 시작된다", "launch, output, exit event가 저장된다"], "verification": ["controlled runner invocation", "persisted lifecycle event 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*"] },
           { "id": "B5", "milestoneId": "M2", "title": "Failure Signal Path", "status": "completed", "percent": 100, "summary": "timeout, fingerprint, retry 정책으로 bounded halt와 retry를 제어한다.", "nextAction": "완료", "dependencies": ["B4 완료"], "deliverables": ["idle timeout 감지기", "wall-clock timeout 감지기", "failure fingerprint normalization 및 retry budget enforcement"], "tasks": ["idle timeout 감지기 구현", "wall-clock timeout 감지기 구현", "failure fingerprint normalization 구현", "duplicate fingerprint halt rule 구현", "automatic retry budget enforcement 구현", "halt / retry / escalation reason code 정규화"], "doneCriteria": ["반복 실패, idle stall, retry 거부가 deterministic하게 기록된다", "automatic retry는 최대 한 번만 수행된다"], "verification": ["timeout scenario 실행", "duplicate fingerprint halt 확인", "retry-budget scenario 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "docs/POLICY_BASELINE.md"] },
           { "id": "B6", "milestoneId": "M3", "title": "Telegram Notifier", "status": "completed", "percent": 100, "summary": "원격에서 run 상태를 확인하고 개입할 수 있는 supervision 경로를 만든다.", "nextAction": "완료", "dependencies": ["B5 완료"], "deliverables": ["Telegram 상태 알림", "status/stop/retry/approve inbound action"], "tasks": ["Telegram bot 설정 및 credential 주입 경로 구현", "상태 알림 메시지 포맷 구현", "status/stop/retry/approve command parser 구현", "inbound action과 orchestrator event 연결", "notifier 실패 시 오류 기록 및 재시도 정책 반영"], "doneCriteria": ["Telegram으로 상태 변화가 전달된다", "remote action이 유효한 state transition을 만든다"], "verification": ["notifier round-trip 확인", "status/stop/retry/approve 동작 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*"] },
-          { "id": "B7", "milestoneId": "M4", "title": "PR Handoff", "status": "completed", "percent": 100, "summary": "성공 경로를 PR opened까지 닫고 인수 검증으로 연결한다.", "nextAction": "완료", "dependencies": ["B6 완료"], "deliverables": ["PR 생성 경로", "handoff summary", "CI visibility snapshot"], "tasks": ["local check bundle 실행 경로 구현", "PR summary/body generator 구현", "GitHub PR creation 연동 구현", "PR reference 및 CI visibility persistence 구현", "end-to-end demo task와 handoff artifact 검증"], "doneCriteria": ["성공한 run이 실제 PR reference를 남긴다", "인수 체크리스트 검증의 기반이 마련된다"], "verification": ["controlled success-path run", "PR reference, summary body, CI visibility 저장 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "README.md"] }
+          { "id": "B7", "milestoneId": "M4", "title": "PR Handoff", "status": "completed", "percent": 100, "summary": "성공 경로를 PR opened까지 닫고 인수 검증으로 연결한다.", "nextAction": "완료", "dependencies": ["B6 완료"], "deliverables": ["PR 생성 경로", "handoff summary", "CI visibility snapshot"], "tasks": ["local check bundle 실행 경로 구현", "PR summary/body generator 구현", "GitHub PR creation 연동 구현", "PR reference 및 CI visibility persistence 구현", "end-to-end demo task와 handoff artifact 검증"], "doneCriteria": ["성공한 run이 실제 PR reference를 남긴다", "인수 체크리스트 검증의 기반이 마련된다"], "verification": ["controlled success-path run", "PR reference, summary body, CI visibility 저장 확인"], "docsToUpdate": ["agent-docs/status/current-status.md", "agent-docs/validation/*", "README.md"] },
+          { "id": "R1", "milestoneId": "M5", "title": "Supervisor Runtime Baseline", "status": "completed", "percent": 100, "summary": "기존 서비스 조각을 단일 supervisor runtime으로 묶어 실제 task orchestration을 제공한다.", "nextAction": "완료", "dependencies": ["M4 완료"], "deliverables": ["synchronous orchestrator", "preflight gate", "start --execute / execute CLI"], "tasks": ["preflight check와 workspace allocation 연결", "failure policy, approval gate, PR handoff를 단일 runtime 흐름으로 결합", "terminal state lock release 반영", "start --execute 와 execute CLI 추가", "runtime baseline 테스트와 validation 기록 추가"], "doneCriteria": ["단일 run이 end-to-end orchestration을 지난다", "risky success diff가 awaiting_human으로 분기한다"], "verification": ["tests/test_orchestrator.py", "tests/test_cli.py", "전체 unittest discover"], "docsToUpdate": ["README.md", "agent.md", "agent-docs/status/current-status.md", "agent-docs/validation/*", "docs/EXECUTION_PLAN.md"] }
         ],
         "activityLog": [
+          { "time": "2026-04-22T09:08:45+09:00", "status": "completed", "title": "마일스톤 M5 완료", "detail": "synchronous supervisor runtime, start --execute / execute CLI, preflight gate, approval gate orchestration, terminal lock release를 추가했다." },
           { "time": "2026-04-21T21:24:30+09:00", "status": "completed", "title": "마일스톤 M4 완료", "detail": "approval-required diff classification, bounded halt interrupt evidence, outcome별 acceptance validation suite를 반영하고 단계 C 인수를 닫았다." },
           { "time": "2026-04-21T21:04:47+09:00", "status": "completed", "title": "작업 패킷 B7 완료", "detail": "local check bundle, git push, GitHub PR 생성, CI visibility persistence, CLI handoff 검증을 추가했다." },
           { "time": "2026-04-21T20:57:15+09:00", "status": "completed", "title": "작업 패킷 B6 완료", "detail": "Telegram notifier, outbound alert, inbound status/stop/retry/approve, CLI notify/receive 검증을 추가했다." },
@@ -846,8 +850,9 @@
           { "level": "info", "label": "B6 검증 완료", "detail": "Telegram notifier outbound/inbound 경로와 CLI notify/receive가 단위 테스트로 검증됐다." },
           { "level": "info", "label": "B7 검증 완료", "detail": "local check bundle, git push, fake GitHub PR creation, CLI handoff가 단위 테스트로 검증됐다." },
           { "level": "info", "label": "단계 C 검증 완료", "detail": "acceptance validation suite가 성공, 실패 제어, 사람 개입, bounded halt 경로를 종단 간으로 검증했다." },
+          { "level": "info", "label": "M5 검증 완료", "detail": "runtime success path, approval gate path, CLI execute 위임, terminal lock release가 단위 테스트와 전체 회귀로 검증됐다." },
           { "level": "watch", "label": "stdlib-first baseline", "detail": "pytest, ruff, uv는 아직 설치되지 않았고 현재는 unittest와 compile check를 사용한다." },
-          { "level": "watch", "label": "다음 슬라이스 미시작", "detail": "supervisor 핵심 런타임과 실제 task orchestration 구현은 아직 착수 전이다." }
+          { "level": "watch", "label": "background runtime 미구현", "detail": "background daemon/heartbeat runtime과 장기 실행 queue/worker 운영면은 아직 남아 있다." }
         ]
       }
     </script>

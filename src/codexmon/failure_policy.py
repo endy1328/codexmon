@@ -41,6 +41,14 @@ class FailureSignalController:
         self.settings = settings or FailurePolicySettings()
 
     def execute(self, run_id: str, instruction: str) -> FailurePolicyResult:
+        return self.execute_with_options(run_id, instruction)
+
+    def execute_with_options(
+        self,
+        run_id: str,
+        instruction: str,
+        defer_success_transition: bool = False,
+    ) -> FailurePolicyResult:
         retries_used = 0
         while True:
             execution = self.adapter.execute_run(
@@ -48,6 +56,7 @@ class FailureSignalController:
                 instruction,
                 idle_timeout_seconds=self.settings.idle_timeout_seconds,
                 wall_clock_timeout_seconds=self.settings.wall_clock_timeout_seconds,
+                defer_success_transition=defer_success_transition,
             )
             run = self.ledger.get_run(run_id)
             if execution.final_state != "analyzing_failure":
