@@ -40,11 +40,13 @@
 - 마일스톤 M7 완료
 - service packaging baseline 완료
 - 마일스톤 M8 완료
+- progress monitor live DB baseline 완료
+- 마일스톤 M9 완료
 - `README.md`, `agent.md`를 정본 문서 모델에 맞게 정렬
 
 ## 다음 운영 작업
 
-- progress monitor DB 직접 연동 설계
+- 별도 범위 승인 전까지 필수 구현 마일스톤 없음
 
 ## 검증 누적
 
@@ -60,6 +62,7 @@
 - `agent-docs/validation/m6-daemon-runtime-validation.md`
 - `agent-docs/validation/m7-crash-recovery-validation.md`
 - `agent-docs/validation/m8-service-packaging-validation.md`
+- `agent-docs/validation/m9-progress-monitor-validation.md`
 
 
 ## 이후로 미루는 항목

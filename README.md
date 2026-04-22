@@ -5,7 +5,7 @@
 감지하며, 각 자율 실행을 아래 세 가지 명시적 결과 중 하나로 끝내는 것이
 목표다.
 
-현재 개발 버전은 `0.0.0.6`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
+현재 개발 버전은 `0.0.0.7`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
 왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다.
 
 - `PR opened`
@@ -16,7 +16,8 @@
 
 이 저장소는 이제 `구현 진행 중` 단계이며, 첫 구현 슬라이스, 마일스톤 `M4`,
 `M5` supervisor runtime baseline, `M6` daemon worker baseline, `M7` crash
-recovery baseline, `M8` service packaging baseline이 완료됐다.
+recovery baseline, `M8` service packaging baseline, `M9` progress monitor live
+DB baseline이 완료됐다.
 
 현재 존재하는 것:
 - 정본 설계 문서 세트
@@ -44,11 +45,13 @@ recovery baseline, `M8` service packaging baseline이 완료됐다.
 - orphaned runner interrupt, duplicate fingerprint halt, recovery lock release 검증
 - `daemon serve`의 SIGTERM/SIGINT stop hook과 service-manager 친화적 종료 경로
 - systemd unit 템플릿, daemon wrapper 스크립트, service runbook
+- live progress snapshot builder와 lightweight HTTP monitor server
 - 최소 `start`, `status`, `stop`, `retry`, `approvals`, `workspace`, `runner`,
-  `telegram`, `handoff`, `doctor`, `version`, `execute`, `daemon` CLI와 baseline test
+  `telegram`, `handoff`, `doctor`, `version`, `execute`, `daemon`, `monitor` CLI와 baseline test
 
 아직 존재하지 않는 것:
-- progress monitor의 DB 직접 연동
+- 추가 process manager 템플릿
+- progress monitor를 위한 별도 인증/접근 제어 계층
 
 ## 고정된 v1 결정
 
@@ -99,11 +102,9 @@ legible하며 recoverable하게 만드는 도구다.
 
 ## 다음 단계
 
-첫 구현 슬라이스, daemon worker baseline, crash recovery baseline, service
-packaging baseline은 닫힌 상태다.
-다음 프로젝트 단계는 `docs/IMPLEMENTATION_SLICE.md`와
-`docs/EXECUTION_PLAN.md`를 기준으로 progress monitor의 DB 직접 연동을 구현하는
-것이다.
+첫 구현 슬라이스와 M5-M9 runtime 확장 마일스톤은 닫힌 상태다.
+현재 계획 문서 기준으로 필수 구현 마일스톤은 모두 완료됐고, 이후 확장은
+별도 judgment 또는 범위 승인 대상이다.
 
 ## 구현 기준선
 
@@ -123,6 +124,7 @@ packaging baseline은 닫힌 상태다.
 - `daemon run-once`, `daemon serve`, `daemon status` background worker 경로
 - orphaned run crash recovery와 recovery-driven retry/halt 경로
 - SIGTERM/SIGINT stop hook, daemon wrapper 스크립트, systemd service packaging baseline
+- live monitor snapshot builder와 `monitor serve` HTTP server
 - stage C acceptance validation suite와 인수 체크리스트 대응 검증
 - `unittest` 기반 테스트
 - `Makefile` 기반 기본 실행 명령
@@ -133,5 +135,7 @@ packaging baseline은 닫힌 상태다.
 - `make doctor`
 - `make test`
 - `make check`
+- `make monitor-serve`
 - `PYTHONPATH=src python3 -m codexmon start "작업 요약" --execute`
 - `PYTHONPATH=src python3 -m codexmon daemon serve`
+- `PYTHONPATH=src python3 -m codexmon monitor snapshot --json`

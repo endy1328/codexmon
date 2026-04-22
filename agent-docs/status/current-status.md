@@ -6,7 +6,7 @@
 
 `구현 진행 중`
 
-첫 구현 슬라이스, 마일스톤 `M4`, `M5`, `M6`, `M7`, `M8`은 완료됐다.
+첫 구현 슬라이스, 마일스톤 `M4`, `M5`, `M6`, `M7`, `M8`, `M9`는 완료됐다.
 
 ## 완료
 
@@ -64,6 +64,11 @@
 - daemon wrapper 스크립트, systemd unit 템플릿, service env 예시가 추가됐다
 - 서비스 운영 runbook과 packaging asset 검증이 추가됐다
 - 마일스톤 `M8`이 완료됐다
+- live progress snapshot builder와 lightweight HTTP monitor server가 추가됐다
+- `monitor snapshot`, `monitor serve`, `make monitor-serve` 경로가 추가됐다
+- progress monitor가 live DB API를 우선 읽고 내장 snapshot을 fallback으로 사용한다
+- monitor live snapshot 및 HTTP route 검증이 추가됐다
+- 마일스톤 `M9`가 완료됐다
 
 ## 진행 중
 
@@ -71,7 +76,7 @@
 
 ## 대기 중
 
-- progress monitor의 DB 직접 연동
+- 없음
 
 ## 리스크 및 블로커
 
@@ -80,6 +85,5 @@
   기존 프로세스에 스트림을 재부착하는 live reattachment는 아직 없다
 - service packaging baseline은 systemd 기준 reference implementation이며,
   추가 process manager 템플릿은 아직 없다
-- progress monitor는 아직 static snapshot 기반이고 DB를 직접 읽지 않는다
 - 구현 단계는 runner, notifier, merge scope에 대한 고정 v1 결정을 다시 열지 않고
   진행해야 하며, 바꾸려면 명시적 재판단이 필요하다

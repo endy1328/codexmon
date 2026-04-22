@@ -25,7 +25,7 @@
 
 아직 시작하지 않은 것:
 
-- progress monitor의 DB 직접 연동
+- 없음
 
 ## 실행 원칙
 
@@ -77,7 +77,9 @@
   recovery-driven retry/halt, terminal lock release가 반영됐다
 - 마일스톤 M8이 완료되면서 SIGTERM/SIGINT stop hook, daemon wrapper,
   systemd service template, service runbook이 반영됐다
-- 다음 작업은 progress monitor DB 연동이다
+- 마일스톤 M9가 완료되면서 live progress snapshot builder, lightweight HTTP monitor
+  server, `monitor snapshot/serve`, HTML live API fallback이 반영됐다
+- 핵심 구현 마일스톤 M0-M9가 모두 완료됐다
 
 ## 구현 마일스톤 개요
 
@@ -193,7 +195,7 @@
 - 선행 의존성: 작업 패킷 R4 또는 별도 독립 구현 판단
 - 산출물: DB read path, live monitor rendering, static snapshot fallback 정리
 - 검증: live monitor가 DB 기준 현재 상태와 agent heartbeat를 보여준다
-- 현재 상태: 대기
+- 현재 상태: 완료
 
 ## 마일스톤별 진행 방식
 
@@ -218,7 +220,7 @@
 
 현재 상태:
 - 완료
-- 후속 구현은 외부 service packaging, progress monitor DB 직접 연동 순으로 이어진다
+- 핵심 구현 마일스톤 M1-M9까지 완료됐다
 
 ### 마일스톤 M1: 기반 레이어 구축
 
@@ -477,6 +479,34 @@
 - 완료
 - 검증 기록: `agent-docs/validation/m8-service-packaging-validation.md`
 
+### 마일스톤 M9: Progress Monitor Live DB
+
+목표:
+- progress monitor가 durable runtime state를 직접 읽도록 바꾼다
+
+포함 범위:
+- 작업 패킷 R5
+
+세부 작업:
+- live progress snapshot builder 구현
+- lightweight HTTP monitor server와 `monitor snapshot/serve` CLI 추가
+- `progress-monitor.html`이 live API를 우선 읽고 내장 snapshot으로 fallback 하도록 갱신
+- monitor live snapshot 및 HTTP route 검증 기록 추가
+
+핵심 산출물:
+- DB 기준 live monitor API
+- 브라우저용 live progress monitor rendering
+- monitor validation 기록
+
+검증 포인트:
+- `monitor snapshot`이 durable runtime state를 JSON으로 출력한다
+- `monitor serve`가 HTML과 `/api/progress`를 함께 서빙한다
+- progress monitor가 active run과 daemon heartbeat를 live 데이터로 반영한다
+
+현재 상태:
+- 완료
+- 검증 기록: `agent-docs/validation/m9-progress-monitor-validation.md`
+
 ## 단계 D: Runtime 확장
 
 목표:
@@ -487,6 +517,10 @@
 
 종료 조건:
 - 터미널 세션에 붙어 있지 않아도 runtime이 지속되고 상태를 재구성할 수 있다
+
+결과:
+- 완료
+- service manager 운영 baseline과 live progress monitor baseline이 모두 구현됐다
 
 ## 단계 C: 종단 간 인수
 
@@ -521,5 +555,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1, M2, M3, M4, M5, M6, M7, M8은 완료됐다.
-다음 작업은 progress monitor DB 연동이다.
+마일스톤 M1, M2, M3, M4, M5, M6, M7, M8, M9는 완료됐다.
+즉시 필수 다음 작업은 없고, 이후 확장은 별도 범위 승인 대상이다.

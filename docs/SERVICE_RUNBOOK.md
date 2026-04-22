@@ -51,6 +51,7 @@ systemctl --user enable --now codexmon-daemon.service
 ```bash
 systemctl --user status codexmon-daemon.service
 PYTHONPATH=src python3 -m codexmon daemon status --limit 10
+PYTHONPATH=src python3 -m codexmon monitor snapshot --json
 ```
 
 재시작:
@@ -81,8 +82,14 @@ systemctl --user stop codexmon-daemon.service
   확인한다
 - orphaned `running`/`analyzing_failure` run이 recovery scan으로 정리되는지 확인한다
 
+## 모니터 운영
+
+- live monitor는 `PYTHONPATH=src python3 -m codexmon monitor serve`로 띄운다
+- 브라우저는 `./api/progress`를 우선 읽고, monitor server가 없으면 내장 snapshot으로
+  fallback 한다
+- 같은 서버는 `/progress.json` 경로도 live JSON으로 제공해 기존 경로와의 호환을 유지한다
+
 ## 현재 한계
 
 - 현재 baseline은 systemd 기준 reference implementation이다
 - 다른 process manager용 템플릿은 아직 없다
-- progress monitor는 아직 DB를 직접 읽지 않고 static snapshot을 사용한다

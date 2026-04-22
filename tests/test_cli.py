@@ -31,6 +31,7 @@ class CliTestCase(unittest.TestCase):
         self.assertIn("start", help_text)
         self.assertIn("execute", help_text)
         self.assertIn("daemon", help_text)
+        self.assertIn("monitor", help_text)
         self.assertIn("status", help_text)
         self.assertIn("stop", help_text)
         self.assertIn("retry", help_text)
@@ -248,6 +249,51 @@ class CliTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("worker_name=codexmon-daemon", buffer.getvalue())
         self.assertIn("status=idle", buffer.getvalue())
+
+    def test_monitor_snapshot_command_prints_live_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            service = mock.Mock()
+            service.build_snapshot.return_value = {
+                "meta": {"updatedAt": "2026-04-22T20:10:00+09:00", "currentFocus": "focus"},
+                "summary": {"currentState": "실행 중", "nextCheckpoint": "체크포인트"},
+                "runtime": {"executionStatus": "running", "activeAgents": [{"name": "Codex"}]},
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                buffer = StringIO()
+                with mock.patch("codexmon.cli.build_progress_monitor_service", return_value=service):
+                    with redirect_stdout(buffer):
+                        exit_code = main(["monitor", "snapshot", "--json"])
+
+        self.assertEqual(exit_code, 0)
+        service.build_snapshot.assert_called_once()
+        self.assertIn('"executionStatus": "running"', buffer.getvalue())
+
+    def test_monitor_serve_command_prints_server_info_and_handles_interrupt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "codexmon.db"
+            env = os.environ.copy()
+            env["CODEXMON_DB_PATH"] = str(db_path)
+            server = mock.Mock()
+            server.serve_forever.side_effect = KeyboardInterrupt
+            service = mock.Mock()
+            service.create_server.return_value = (
+                server,
+                mock.Mock(host="127.0.0.1", port=8765, url="http://127.0.0.1:8765/"),
+            )
+            service.html_asset_path.return_value = Path("agent-docs/status/progress-monitor.html")
+            with mock.patch.dict(os.environ, env, clear=True):
+                buffer = StringIO()
+                with mock.patch("codexmon.cli.build_progress_monitor_service", return_value=service):
+                    with redirect_stdout(buffer):
+                        exit_code = main(["monitor", "serve"])
+
+        self.assertEqual(exit_code, 0)
+        service.create_server.assert_called_once_with(host="127.0.0.1", port=8765)
+        server.server_close.assert_called_once()
+        self.assertIn("url=http://127.0.0.1:8765/", buffer.getvalue())
 
 
 if __name__ == "__main__":

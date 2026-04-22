@@ -18,6 +18,7 @@ from codexmon.failure_policy import FailurePolicyResult, FailurePolicySettings, 
 from codexmon.ledger import LedgerError, RecordNotFoundError, RunLedger
 from codexmon.orchestrator import OrchestratorError, SupervisorRuntime
 from codexmon.pr_handoff import GitHubApiClient, PRHandoffError, PRHandoffService
+from codexmon.progress_monitor import ProgressMonitorError, ProgressMonitorService
 from codexmon.telegram_notifier import (
     TelegramBotApiTransport,
     TelegramNotifier,
@@ -95,6 +96,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     daemon_status_parser.add_argument("--limit", type=int, default=20, help="heartbeat 조회 개수")
     daemon_status_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    monitor_parser = subparsers.add_parser("monitor", help="live progress monitor를 조회하거나 서빙합니다.")
+    monitor_subparsers = monitor_parser.add_subparsers(dest="monitor_command")
+    monitor_snapshot_parser = monitor_subparsers.add_parser(
+        "snapshot",
+        help="DB 기준 live progress snapshot을 출력합니다.",
+    )
+    monitor_snapshot_parser.add_argument("--json", action="store_true", help="JSON으로 출력합니다.")
+    monitor_serve_parser = monitor_subparsers.add_parser(
+        "serve",
+        help="progress monitor HTML과 live API를 함께 서빙합니다.",
+    )
+    monitor_serve_parser.add_argument("--host", default="127.0.0.1", help="bind host")
+    monitor_serve_parser.add_argument("--port", type=int, default=8765, help="bind port")
+    monitor_serve_parser.add_argument("--json", action="store_true", help="서버 정보만 JSON으로 출력합니다.")
     status_parser = subparsers.add_parser("status", help="run ledger 상태를 조회합니다.")
     status_parser.add_argument("run_id", nargs="?", help="조회할 run ID")
     status_parser.add_argument("--limit", type=int, default=10, help="최근 run 조회 개수")
@@ -318,6 +333,49 @@ def command_daemon(args: argparse.Namespace) -> int:
         return 0
 
     raise OrchestratorError("daemon 하위 명령이 필요합니다.")
+
+
+def build_progress_monitor_service(settings: Settings, ledger: RunLedger) -> ProgressMonitorService:
+    return ProgressMonitorService(
+        ledger=ledger,
+        worker_name=settings.daemon_worker_name,
+    )
+
+
+def command_monitor(args: argparse.Namespace) -> int:
+    settings = Settings.from_env()
+    ledger = RunLedger(settings.db_path)
+    service = build_progress_monitor_service(settings, ledger)
+
+    if args.monitor_command == "snapshot":
+        snapshot = service.build_snapshot()
+        if args.json:
+            print(json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            print(f"updated_at={snapshot['meta']['updatedAt']}")
+            print(f"execution_status={snapshot['runtime']['executionStatus']}")
+            print(f"current_focus={snapshot['meta']['currentFocus']}")
+            print(f"current_state={snapshot['summary']['currentState']}")
+            print(f"next_checkpoint={snapshot['summary']['nextCheckpoint']}")
+            print(f"active_agents={len(snapshot['runtime'].get('activeAgents', []))}")
+        return 0
+
+    if args.monitor_command == "serve":
+        server, info = service.create_server(host=args.host, port=args.port)
+        try:
+            if args.json:
+                print(json.dumps(asdict(info), ensure_ascii=False, indent=2, sort_keys=True))
+            else:
+                print(f"url={info.url}")
+                print(f"html_asset={service.html_asset_path()}")
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+        return 0
+
+    raise ProgressMonitorError("monitor 하위 명령이 필요합니다.")
 
 
 def command_status(args: argparse.Namespace) -> int:
@@ -649,6 +707,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_execute(args)
         if args.command == "daemon":
             return command_daemon(args)
+        if args.command == "monitor":
+            return command_monitor(args)
         if args.command == "status":
             return command_status(args)
         if args.command == "stop":
@@ -672,6 +732,7 @@ def main(argv: list[str] | None = None) -> int:
         CodexAdapterError,
         ApprovalPolicyError,
         OrchestratorError,
+        ProgressMonitorError,
         TelegramNotifierError,
         PRHandoffError,
     ) as exc:

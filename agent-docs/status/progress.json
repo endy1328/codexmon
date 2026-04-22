@@ -3,32 +3,32 @@
     "projectName": "codexmon",
     "pageTitle": "구현 진행 모니터",
     "phaseLabel": "구현 진행 중",
-    "updatedAt": "2026-04-22T19:40:13+09:00",
-    "currentFocus": "M9 progress monitor live DB 준비",
-    "currentSummary": "M8이 완료됐고 systemd 기준 service packaging baseline이 들어갔다. 다음 작업은 progress monitor DB 직접 연동이다.",
+    "updatedAt": "2026-04-22T20:01:00+09:00",
+    "currentFocus": "M9 progress monitor live DB 완료",
+    "currentSummary": "M9가 완료됐고 progress monitor는 live DB API를 우선 사용한다. monitor snapshot/serve 경로가 추가됐다.",
     "activeMilestoneId": "M9",
     "activePacketId": "R5",
     "autoRefreshSeconds": 15
   },
   "summary": {
-    "currentState": "M8 완료, M9 대기",
-    "nextCheckpoint": "progress monitor live DB 착수",
+    "currentState": "M9 완료",
+    "nextCheckpoint": "추가 범위 승인 또는 후속 milestone 정의 대기",
     "completionRule": "각 작업 패킷은 개별 검증을 통과한 뒤 다음 단계로 넘어간다.",
-    "completionText": "첫 구현 슬라이스, synchronous runtime, daemon worker, crash recovery, service packaging baseline이 닫혔다."
+    "completionText": "첫 구현 슬라이스와 M5-M9 runtime 확장 마일스톤이 닫혔다."
   },
   "runtime": {
     "executionStatus": "idle",
-    "summary": "M8을 닫고 service packaging, validation 기록, 모니터 스냅샷을 갱신했다. 다음 구현 슬라이스는 progress monitor DB 직접 연동이다.",
-    "lastHeartbeatAt": "2026-04-22T19:40:13+09:00",
+    "summary": "M9를 닫고 live monitor snapshot builder, HTTP server, validation 기록을 갱신했다.",
+    "lastHeartbeatAt": "2026-04-22T20:01:00+09:00",
     "heartbeatGraceSeconds": 60,
     "activeAgents": [
       {
         "name": "Codex",
         "role": "메인 에이전트",
         "status": "idle",
-        "task": "다음 구현 슬라이스 대기",
-        "detail": "M8 service packaging baseline과 milestone push를 닫았고 다음 포커스는 progress monitor DB 직접 연동이다.",
-        "updatedAt": "2026-04-22T19:40:13+09:00",
+        "task": "핵심 구현 마일스톤 완료",
+        "detail": "M9 progress monitor live DB baseline을 닫았고 monitor live API와 fallback snapshot 기준을 정리했다.",
+        "updatedAt": "2026-04-22T20:01:00+09:00",
         "progress": 100
       }
     ]
@@ -69,6 +69,10 @@
     {
       "label": "M8 검증",
       "href": "../validation/m8-service-packaging-validation.md"
+    },
+    {
+      "label": "M9 검증",
+      "href": "../validation/m9-progress-monitor-validation.md"
     },
     {
       "label": "Service Runbook",
@@ -237,11 +241,11 @@
     {
       "id": "M9",
       "name": "Progress Monitor Live DB",
-      "status": "next",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "weight": 10,
       "scope": "R5",
-      "focus": "progress monitor가 durable runtime state를 직접 읽게 만든다",
+      "focus": "progress monitor live DB baseline이 완료됐다",
       "deliverables": [
         "DB read path",
         "live progress rendering",
@@ -679,10 +683,10 @@
       "id": "R5",
       "milestoneId": "M9",
       "title": "Progress Monitor Live DB",
-      "status": "next",
-      "percent": 0,
+      "status": "completed",
+      "percent": 100,
       "summary": "progress monitor가 durable runtime state를 직접 읽도록 바꾼다.",
-      "nextAction": "service packaging 이후 착수",
+      "nextAction": "완료",
       "dependencies": [
         "M8 완료"
       ],
@@ -714,6 +718,12 @@
     }
   ],
   "activityLog": [
+    {
+      "time": "2026-04-22T20:01:00+09:00",
+      "status": "completed",
+      "title": "마일스톤 M9 완료",
+      "detail": "live progress snapshot builder, lightweight HTTP monitor server, monitor snapshot/serve baseline을 추가했다."
+    },
     {
       "time": "2026-04-22T19:40:13+09:00",
       "status": "completed",
@@ -809,6 +819,11 @@
   "watchItems": [
     {
       "level": "info",
+      "label": "M9 검증 완료",
+      "detail": "live monitor snapshot builder, HTTP route, monitor CLI, embedded fallback sync가 단위 테스트와 전체 회귀로 검증됐다."
+    },
+    {
+      "level": "info",
       "label": "Git 초기화 완료",
       "detail": "저장소는 main branch 기준으로 초기화됐다."
     },
@@ -876,11 +891,6 @@
       "level": "watch",
       "label": "추가 process manager 템플릿 미구현",
       "detail": "현재 packaging baseline은 systemd 기준 reference implementation이며 다른 process manager 템플릿은 아직 없다."
-    },
-    {
-      "level": "watch",
-      "label": "progress monitor DB 미구현",
-      "detail": "progress monitor는 아직 static snapshot 기반이고 durable runtime state를 직접 읽지 않는다."
     }
   ]
 }

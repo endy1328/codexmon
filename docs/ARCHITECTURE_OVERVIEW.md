@@ -23,7 +23,7 @@
 - 첫 local control plane은 CLI
 - 첫 supervisor runtime은 synchronous single-run execution
 - local polling daemon worker, orphan crash recovery, systemd service packaging baseline이 구현됐다
-- 다음 runtime 확장은 progress monitor live DB 연동이다
+- progress monitor live DB baseline과 lightweight HTTP monitor server가 구현됐다
 - 첫 durable store는 로컬 `SQLite`
 - 첫 GitHub 범위는 PR 생성 + CI 가시화
 
@@ -47,6 +47,8 @@ auto-merge는 범위 밖이다.
 9. background daemon worker는 `queued`, `retry_pending`, `pr_handoff` run을
    polling하고, orphaned `running`/`analyzing_failure` run을 recovery하며,
    service manager 아래에서도 일관된 stop reason과 heartbeat를 남긴다.
+10. progress monitor server는 durable runtime state와 heartbeat를 읽어 live API와
+    HTML monitor에 반영하고, 브라우저 fallback snapshot과 분리된 현재 상태를 제공한다.
 
 ## 컴포넌트 책임
 
