@@ -162,6 +162,47 @@ class FailurePolicyTestCase(unittest.TestCase):
         self.assertEqual(result.final_state, "halted")
         self.assertEqual(timeout_events[-1].payload["timeout_type"], "wall_clock_timeout")
 
+    def test_recover_orphaned_run_reuses_retry_policy(self) -> None:
+        retry_script = make_script(
+            self.base_path,
+            "recover-success.sh",
+            """
+            echo "recovered attempt"
+            exit 0
+            """,
+        )
+        task = self.ledger.create_task("recovery retry")
+        run = self.ledger.create_run(task.task_id)
+        self.allocator.allocate(run.run_id)
+        run = self.ledger.transition_run(run.run_id, "running", "runner launched")
+        self.ledger.append_event(
+            run.run_id,
+            event_type="runner.output",
+            reason_code="stdout output",
+            payload={"stream": "stdout", "line": "orphan recovery token"},
+            attempt_number=run.attempt_number,
+        )
+        controller = FailureSignalController(
+            ledger=self.ledger,
+            adapter=CodexAdapter(self.ledger, codex_command=str(retry_script)),
+            settings=FailurePolicySettings(
+                automatic_retry_budget=1,
+                idle_timeout_seconds=5.0,
+                wall_clock_timeout_seconds=5.0,
+            ),
+        )
+
+        result = controller.recover_orphaned_run(
+            run_id=run.run_id,
+            failure_class="recovery_missing_process",
+            reason_code="orphaned running state recovered",
+        )
+
+        self.assertEqual(result.final_state, "retry_pending")
+        self.assertEqual(result.retries_used, 1)
+        self.assertIn("recovery_missing_process", result.last_failure_fingerprint)
+        self.assertEqual(self.ledger.get_run(run.run_id).current_state, "retry_pending")
+
 
 class FailurePolicyCliTestCase(unittest.TestCase):
     def test_runner_supervise_cli_applies_policy(self) -> None:

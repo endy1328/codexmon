@@ -1,6 +1,6 @@
 # 아키텍처 개요
 
-날짜: 2026-04-21
+날짜: 2026-04-22
 상태: 구현 진행 중
 
 ## 이 문서의 역할
@@ -22,7 +22,8 @@
 - 첫 notifier는 `Telegram`
 - 첫 local control plane은 CLI
 - 첫 supervisor runtime은 synchronous single-run execution
-- 다음 runtime 확장은 local polling daemon worker
+- local polling daemon worker와 orphan crash recovery baseline이 구현됐다
+- 다음 runtime 확장은 외부 process manager 연동과 progress monitor live DB 연동이다
 - 첫 durable store는 로컬 `SQLite`
 - 첫 GitHub 범위는 PR 생성 + CI 가시화
 
@@ -44,7 +45,8 @@ auto-merge는 범위 밖이다.
 8. run이 성공하면 GitHub handoff 경로가 PR을 생성하고 PR reference와
    CI visibility 상태를 기록한다.
 9. background daemon worker는 `queued`, `retry_pending`, `pr_handoff` run을
-   polling하고 heartbeat를 durable store에 남긴다.
+   polling하고, orphaned `running`/`analyzing_failure` run을 recovery하며,
+   heartbeat를 durable store에 남긴다.
 
 ## 컴포넌트 책임
 
@@ -142,6 +144,7 @@ event stream을 기록해야 한다. 여기에는 다음이 포함된다.
 - lifecycle event
 - runner launch 및 exit signal
 - timeout 및 idle 감지
+- orphaned run recovery와 recovery interrupt signal
 - failure fingerprint
 - approval 요청과 operator 응답
 - notifier 전달 기록

@@ -170,6 +170,46 @@ class RunLedgerTestCase(unittest.TestCase):
         self.assertEqual(len(heartbeats), 1)
         self.assertEqual(heartbeats[0].payload["runnable_runs"], 2)
 
+    def test_recoverable_run_query_prioritizes_running_then_analyzing_failure(self) -> None:
+        task = self.ledger.create_task("recovery query")
+        running_run = self.ledger.create_run(task.task_id)
+        analyzing_run = self.ledger.create_run(task.task_id)
+
+        running_run = self.ledger.transition_run(running_run.run_id, "preflight", "accepted")
+        running_run = self.ledger.assign_workspace(
+            running_run.run_id,
+            "/tmp/codexmon/recovery-running",
+            "codexmon/recovery-running",
+        )
+        running_run = self.ledger.transition_run(running_run.run_id, "workspace_allocated", "preflight passed")
+        running_run = self.ledger.transition_run(running_run.run_id, "running", "runner launched")
+
+        analyzing_run = self.ledger.transition_run(analyzing_run.run_id, "preflight", "accepted")
+        analyzing_run = self.ledger.assign_workspace(
+            analyzing_run.run_id,
+            "/tmp/codexmon/recovery-failure",
+            "codexmon/recovery-failure",
+        )
+        analyzing_run = self.ledger.transition_run(
+            analyzing_run.run_id,
+            "workspace_allocated",
+            "preflight passed",
+        )
+        analyzing_run = self.ledger.transition_run(analyzing_run.run_id, "running", "runner launched")
+        analyzing_run = self.ledger.transition_run(
+            analyzing_run.run_id,
+            "analyzing_failure",
+            "failure, timeout, or loop signal",
+            runner_signal="recovery_missing_process",
+        )
+
+        recoverable = self.ledger.list_recoverable_runs(limit=5)
+
+        self.assertEqual(
+            [item.run_id for item in recoverable],
+            [running_run.run_id, analyzing_run.run_id],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

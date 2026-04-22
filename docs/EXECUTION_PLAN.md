@@ -25,7 +25,6 @@
 
 아직 시작하지 않은 것:
 
-- running state crash recovery
 - 외부 process manager 연동과 service packaging
 - progress monitor의 DB 직접 연동
 
@@ -75,7 +74,9 @@
   `execute`, preflight gate, approval gate, lock release orchestration이 반영됐다
 - 마일스톤 M6가 완료되면서 daemon worker, runtime heartbeat persistence,
   async operator resume pickup, `daemon run-once/serve/status`가 반영됐다
-- 다음 작업은 running state crash recovery와 service packaging이다
+- 마일스톤 M7이 완료되면서 orphaned `running`/`analyzing_failure` recovery,
+  recovery-driven retry/halt, terminal lock release가 반영됐다
+- 다음 작업은 service packaging과 progress monitor DB 연동이다
 
 ## 구현 마일스톤 개요
 
@@ -90,6 +91,9 @@
 | M4 | 성공 경로 및 인수 | B7 + 단계 C | PR handoff, CI visibility, 종단 간 검증 기록 | 정본 데모 시나리오와 인수 체크리스트가 통과한다 |
 | M5 | Supervisor Runtime Baseline | R1 | synchronous orchestrator, preflight/runtime/handoff 연결 | `start --execute` 또는 `execute`로 단일 run을 끝까지 진행할 수 있다 |
 | M6 | Daemon Worker Baseline | R2 | polling daemon, runtime heartbeat, async resume pickup | background worker가 runnable run을 계속 처리할 수 있다 |
+| M7 | Crash Recovery Baseline | R3 | orphan recovery, recovery policy, terminal cleanup | daemon restart 뒤 orphaned run을 retry 또는 halt로 복구할 수 있다 |
+| M8 | Service Packaging Baseline | R4 | 외부 process manager 연동, daemon runbook, 운영 배포 기준 | 터미널 세션과 분리된 daemon lifecycle 운영 기준이 성립한다 |
+| M9 | Progress Monitor Live DB | R5 | durable runtime state 조회, live progress rendering | progress monitor가 static snapshot 없이 현재 runtime 상태를 읽는다 |
 
 ## 단계 B: 첫 구현 슬라이스 작업 패킷
 
@@ -165,6 +169,30 @@
 - 산출물: runtime heartbeat persistence, `daemon run-once`, `daemon serve`, `daemon status`
 - 검증: daemon queued pickup, daemon resume pickup, heartbeat query, 전체 회귀
 - 현재 상태: 완료
+
+### 작업 패킷 R3: Crash Recovery Baseline
+
+- 목표: orphaned `running`/`analyzing_failure` run을 daemon이 retry 또는 halt로 복구한다
+- 선행 의존성: 작업 패킷 R2
+- 산출물: recovery scan, orphaned runner interrupt, recovery-driven retry/halt
+- 검증: orphaned running process recovery, analyzing_failure recovery policy, 전체 회귀
+- 현재 상태: 완료
+
+### 작업 패킷 R4: Service Packaging Baseline
+
+- 목표: daemon lifecycle을 외부 process manager 아래에서 일관되게 운영할 수 있게 한다
+- 선행 의존성: 작업 패킷 R3
+- 산출물: daemon runbook, service template, 운영 배포 기준
+- 검증: service manager 아래 daemon 시작/중지/재시작 일관성
+- 현재 상태: 대기
+
+### 작업 패킷 R5: Progress Monitor Live DB
+
+- 목표: progress monitor가 durable runtime state를 직접 읽도록 바꾼다
+- 선행 의존성: 작업 패킷 R4 또는 별도 독립 구현 판단
+- 산출물: DB read path, live monitor rendering, static snapshot fallback 정리
+- 검증: live monitor가 DB 기준 현재 상태와 agent heartbeat를 보여준다
+- 현재 상태: 대기
 
 ## 마일스톤별 진행 방식
 
@@ -391,13 +419,41 @@
 - 완료
 - 검증 기록: `agent-docs/validation/m6-daemon-runtime-validation.md`
 
+### 마일스톤 M7: Crash Recovery Baseline
+
+목표:
+- orphaned `running`/`analyzing_failure` run을 daemon이 deterministic하게 복구한다
+
+포함 범위:
+- 작업 패킷 R3
+
+세부 작업:
+- recovery candidate 조회와 daemon recovery scan 구현
+- orphaned runner pid 검증과 interrupt 경로 구현
+- `running -> analyzing_failure -> retry_pending/halted` recovery policy 연결
+- recovery terminal state의 repository lock release 반영
+- crash recovery validation 기록 추가
+
+핵심 산출물:
+- crash recovery daemon baseline
+- recovery-driven retry/halt policy
+- recovery validation 기록
+
+검증 포인트:
+- orphaned running process가 interrupt 뒤 재시도 또는 halt로 복구된다
+- orphaned analyzing_failure run이 failure policy를 다시 통과한다
+- recovery terminal state에서 repository lock이 해제된다
+
+현재 상태:
+- 완료
+- 검증 기록: `agent-docs/validation/m7-crash-recovery-validation.md`
+
 ## 단계 D: Runtime 확장
 
 목표:
 - current daemon baseline을 crash recovery와 운영 배포 가능한 형태로 확장한다
 
 필수 검증:
-- running state crash 후 orphaned run recovery가 가능하다
 - 외부 process manager 아래에서도 daemon 생명주기와 heartbeat가 일관된다
 - progress monitor가 static snapshot이 아니라 durable runtime state를 직접 읽는다
 
@@ -437,5 +493,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1, M2, M3, M4, M5, M6는 완료됐다.
-다음 작업은 running state crash recovery, service packaging, progress monitor DB 연동이다.
+마일스톤 M1, M2, M3, M4, M5, M6, M7은 완료됐다.
+다음 작업은 service packaging과 progress monitor DB 연동이다.

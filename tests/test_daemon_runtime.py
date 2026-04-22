@@ -195,6 +195,56 @@ class SupervisorDaemonTestCase(unittest.TestCase):
         self.assertEqual(result.final_state, "completed")
         self.assertEqual(self.ledger.get_run(run.run_id).current_state, "completed")
 
+    def test_run_once_recovers_orphaned_running_process_and_retries(self) -> None:
+        script = make_script(
+            self.base_path,
+            "daemon-recover-success.sh",
+            "printf 'daemon recovered success\\n' > recovered.txt\n",
+        )
+        daemon = self._build_daemon(str(script))
+        task = self.ledger.create_task("daemon recovery path", repo_owner="octo", repo_name="hello-world")
+        run = self.ledger.create_run(task.task_id)
+
+        allocation = self.allocator.allocate(run.run_id)
+        orphan = subprocess.Popen(["sleep", "30"])
+        self.addCleanup(orphan.kill)
+        running = self.ledger.transition_run(
+            run.run_id,
+            "running",
+            "runner launched",
+            workspace_path=allocation.workspace_path,
+            branch_name=allocation.branch_name,
+        )
+        self.ledger.append_event(
+            run.run_id,
+            event_type="runner.launched",
+            reason_code="runner launched",
+            payload={"command": ["sleep", "30"], "pid": orphan.pid},
+            attempt_number=running.attempt_number,
+        )
+        self.ledger.append_event(
+            run.run_id,
+            event_type="runner.output",
+            reason_code="stdout output",
+            payload={"stream": "stdout", "line": "daemon orphan recovery token"},
+            attempt_number=running.attempt_number,
+        )
+
+        result = daemon.run_once()
+        orphan.wait(timeout=2.0)
+        events = [event.event_type for event in self.ledger.list_events(run.run_id)]
+        heartbeats = self.ledger.list_runtime_heartbeats(limit=10, worker_name="codexmon-daemon")
+        heartbeat_statuses = [item.status for item in heartbeats]
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.final_state, "completed")
+        self.assertEqual(self.ledger.get_run(run.run_id).current_state, "completed")
+        self.assertIn("daemon.recovery.detected", events)
+        self.assertIn("daemon.recovery.signal_sent", events)
+        self.assertIn("daemon.recovery.applied", events)
+        self.assertIn("recovered", heartbeat_statuses)
+        self.assertEqual(self.ledger.get_repository_lock(self.allocator.repo_key()), None)
+
     def test_serve_records_started_idle_and_stopped_heartbeats(self) -> None:
         daemon = self._build_daemon(str(make_script(self.base_path, "noop.sh", "exit 0\n")))
 

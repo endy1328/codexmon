@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+from pathlib import Path
+import signal
 import time
 from typing import Callable
 
 from codexmon.ledger import RunLedger, RuntimeHeartbeatRecord
 from codexmon.orchestrator import OrchestrationResult, SupervisorRuntime
+from codexmon.state_machine import TERMINAL_STATES
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,16 @@ class DaemonServeResult:
     stop_reason: str
 
 
+@dataclass(frozen=True)
+class RecoveryResult:
+    run_id: str
+    source_state: str
+    final_state: str
+    outcome: str
+    failure_class: str
+    lock_released: bool
+
+
 class SupervisorDaemon:
     """Poll runnable runs, execute them through the orchestrator, and persist heartbeats."""
 
@@ -54,6 +68,30 @@ class SupervisorDaemon:
     def run_once(self, chat_id: str = "") -> DaemonTickResult:
         run_id = ""
         try:
+            recovery = self._recover_orphaned_run()
+            if recovery is not None:
+                heartbeat = self._record(
+                    "recovered",
+                    run_id=recovery.run_id,
+                    payload={
+                        "source_state": recovery.source_state,
+                        "final_state": recovery.final_state,
+                        "failure_class": recovery.failure_class,
+                        "lock_released": recovery.lock_released,
+                    },
+                )
+                if recovery.final_state not in {"queued", "preflight", "workspace_allocated", "retry_pending", "pr_handoff"}:
+                    return self._tick_result(
+                        processed=True,
+                        idle=False,
+                        ok=True,
+                        run_id=recovery.run_id,
+                        final_state=recovery.final_state,
+                        outcome=recovery.outcome,
+                        error="",
+                        heartbeat=heartbeat,
+                    )
+
             runnable = self.ledger.list_runnable_runs(limit=1)
             if not runnable:
                 heartbeat = self._record("idle", payload={"runnable_runs": 0})
@@ -204,6 +242,250 @@ class SupervisorDaemon:
         if result.final_state == "halted":
             return "halted"
         return result.final_state or "processed"
+
+    def _recover_orphaned_run(self) -> RecoveryResult | None:
+        candidates = self.ledger.list_recoverable_runs(limit=1)
+        if not candidates:
+            return None
+
+        run = candidates[0]
+        failure_class = self._failure_class_from_events(run.run_id)
+        reason_code = f"orphaned {run.current_state} state recovered"
+        lock_released = False
+
+        if run.current_state == "running":
+            failure_class = self._recover_running_process(run.run_id, run.attempt_number)
+            if failure_class == "recovery_uninterruptible":
+                halted = self.ledger.transition_run(
+                    run.run_id,
+                    "halted",
+                    "recovery failed: orphaned runner could not be interrupted",
+                )
+                lock_released = self.runtime.allocator.release(run.run_id).lock_released
+                self.ledger.append_event(
+                    run.run_id,
+                    event_type="daemon.recovery.failed",
+                    reason_code="orphaned runner could not be interrupted",
+                    payload={"lock_released": lock_released},
+                    attempt_number=halted.attempt_number,
+                )
+                return RecoveryResult(
+                    run_id=halted.run_id,
+                    source_state=run.current_state,
+                    final_state=halted.current_state,
+                    outcome=halted.outcome,
+                    failure_class=failure_class,
+                    lock_released=lock_released,
+                )
+
+        self.ledger.append_event(
+            run.run_id,
+            event_type="daemon.recovery.detected",
+            reason_code=reason_code,
+            payload={"source_state": run.current_state, "failure_class": failure_class},
+            attempt_number=run.attempt_number,
+        )
+        result = self.runtime.failure_controller.recover_orphaned_run(
+            run_id=run.run_id,
+            failure_class=failure_class,
+            reason_code=reason_code,
+        )
+        recovered_run = self.ledger.get_run(run.run_id)
+        if recovered_run.current_state in TERMINAL_STATES:
+            lock_released = self.runtime.allocator.release(run.run_id).lock_released
+
+        self.ledger.append_event(
+            run.run_id,
+            event_type="daemon.recovery.applied",
+            reason_code="daemon recovery applied",
+            payload={
+                "source_state": run.current_state,
+                "final_state": recovered_run.current_state,
+                "failure_class": failure_class,
+                "lock_released": lock_released,
+                "policy_reason": result.reason_code,
+            },
+            attempt_number=recovered_run.attempt_number,
+        )
+        return RecoveryResult(
+            run_id=recovered_run.run_id,
+            source_state=run.current_state,
+            final_state=recovered_run.current_state,
+            outcome=recovered_run.outcome,
+            failure_class=failure_class,
+            lock_released=lock_released,
+        )
+
+    def _recover_running_process(self, run_id: str, attempt_number: int) -> str:
+        launch_event, exit_recorded = self._latest_runner_launch(run_id, attempt_number)
+        if exit_recorded:
+            self.ledger.append_event(
+                run_id,
+                event_type="daemon.recovery.process_missing",
+                reason_code="runner exit already recorded for orphaned run",
+                payload={},
+                attempt_number=attempt_number,
+            )
+            return "recovery_missing_process"
+
+        if launch_event is None:
+            self.ledger.append_event(
+                run_id,
+                event_type="daemon.recovery.process_missing",
+                reason_code="runner launch event missing for orphaned run",
+                payload={},
+                attempt_number=attempt_number,
+            )
+            return "recovery_missing_launch"
+
+        pid = self._event_pid(launch_event)
+        command_name = self._event_command_name(launch_event)
+        if pid is None:
+            self.ledger.append_event(
+                run_id,
+                event_type="daemon.recovery.process_missing",
+                reason_code="runner pid missing for orphaned run",
+                payload={"command_name": command_name},
+                attempt_number=attempt_number,
+            )
+            return "recovery_missing_pid"
+
+        if not self._is_expected_process_alive(pid, command_name):
+            self.ledger.append_event(
+                run_id,
+                event_type="daemon.recovery.process_missing",
+                reason_code="runner process not found for orphaned run",
+                payload={"pid": pid, "command_name": command_name},
+                attempt_number=attempt_number,
+            )
+            return "recovery_missing_process"
+
+        self.ledger.append_event(
+            run_id,
+            event_type="daemon.recovery.signal_sent",
+            reason_code="sent SIGTERM to orphaned runner",
+            payload={"pid": pid, "signal": "SIGTERM", "command_name": command_name},
+            attempt_number=attempt_number,
+        )
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return "recovery_missing_process"
+        except PermissionError:
+            return "recovery_uninterruptible"
+
+        if self._wait_for_process_exit(pid, timeout_seconds=1.0):
+            return "recovery_interrupted"
+
+        self.ledger.append_event(
+            run_id,
+            event_type="daemon.recovery.signal_sent",
+            reason_code="sent SIGKILL to orphaned runner",
+            payload={"pid": pid, "signal": "SIGKILL", "command_name": command_name},
+            attempt_number=attempt_number,
+        )
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return "recovery_interrupted"
+        except PermissionError:
+            return "recovery_uninterruptible"
+
+        if self._wait_for_process_exit(pid, timeout_seconds=1.0):
+            return "recovery_interrupted"
+        return "recovery_uninterruptible"
+
+    def _latest_runner_launch(self, run_id: str, attempt_number: int) -> tuple[object | None, bool]:
+        exit_recorded = False
+        for event in reversed(self.ledger.list_events(run_id)):
+            if event.attempt_number != attempt_number:
+                continue
+            if event.event_type == "runner.exit":
+                exit_recorded = True
+                continue
+            if event.event_type == "runner.launched":
+                return event, exit_recorded
+        return None, exit_recorded
+
+    def _failure_class_from_events(self, run_id: str) -> str:
+        for event in reversed(self.ledger.list_events(run_id)):
+            if event.event_type == "runner.timeout":
+                timeout_type = event.payload.get("timeout_type")
+                if isinstance(timeout_type, str) and timeout_type:
+                    return timeout_type
+            if event.event_type == "runner.exit":
+                exit_code = event.payload.get("exit_code")
+                if isinstance(exit_code, int):
+                    return f"exit={exit_code}"
+                if isinstance(exit_code, str) and exit_code:
+                    return f"exit={exit_code}"
+            if event.event_type == "runner.launch_failed":
+                return "launch_failed"
+            if event.event_type == "state.transition":
+                runner_signal = event.payload.get("runner_signal")
+                if isinstance(runner_signal, str) and runner_signal:
+                    return runner_signal
+        return "recovery_missing_process"
+
+    def _event_pid(self, event: object) -> int | None:
+        payload = getattr(event, "payload", {})
+        pid = payload.get("pid")
+        if isinstance(pid, int):
+            return pid
+        if isinstance(pid, str) and pid.isdigit():
+            return int(pid)
+        return None
+
+    def _event_command_name(self, event: object) -> str:
+        payload = getattr(event, "payload", {})
+        command = payload.get("command")
+        if isinstance(command, list) and command:
+            return os.path.basename(str(command[0]))
+        if isinstance(command, str) and command:
+            return os.path.basename(command)
+        return ""
+
+    def _is_expected_process_alive(self, pid: int, command_name: str) -> bool:
+        if not self._is_process_alive(pid):
+            return False
+        if not command_name:
+            return True
+        actual = self._process_command_name(pid)
+        return actual == command_name
+
+    def _process_command_name(self, pid: int) -> str:
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                raw = handle.read().split(b"\0", 1)[0]
+        except OSError:
+            return ""
+        if not raw:
+            return ""
+        return os.path.basename(raw.decode(errors="ignore"))
+
+    def _wait_for_process_exit(self, pid: int, timeout_seconds: float) -> bool:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            if not self._is_process_alive(pid):
+                return True
+            time.sleep(0.05)
+        return not self._is_process_alive(pid)
+
+    def _is_process_alive(self, pid: int) -> bool:
+        proc_stat = f"/proc/{pid}/stat"
+        if os.path.exists(proc_stat):
+            try:
+                state = Path(proc_stat).read_text(encoding="utf-8").split()[2]
+            except (OSError, IndexError):
+                return False
+            return state != "Z"
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
 
     def _tick_result(
         self,

@@ -69,57 +69,99 @@ class FailureSignalController:
                     reason_code=run.state_reason,
                 )
 
-            fingerprint = self._normalize_failure_fingerprint(execution, run_id)
-            existing = [item.fingerprint for item in self.ledger.list_failure_fingerprints(run_id)]
-            self.ledger.record_failure_fingerprint(
+            decision = self._apply_failure_policy(
                 run_id=run_id,
-                fingerprint=fingerprint,
                 command_name=Path(execution.command[0]).name,
                 failure_class=self._failure_class(execution),
                 dominant_token=self._dominant_token(run_id),
             )
 
-            if fingerprint in existing:
-                reason_code = "retry denied: duplicate failure fingerprint"
-                self.ledger.append_event(
-                    run_id,
-                    event_type="failure.policy.decision",
-                    reason_code=reason_code,
-                    payload={"fingerprint": fingerprint, "decision": "halted"},
-                )
-                run = self.ledger.transition_run(
-                    run_id,
-                    "halted",
-                    reason_code,
-                    failure_fingerprint=fingerprint,
-                )
-                return FailurePolicyResult(
-                    run_id=run_id,
-                    final_state=run.current_state,
-                    retries_used=retries_used,
-                    attempt_number=run.attempt_number,
-                    last_failure_fingerprint=fingerprint,
-                    reason_code=reason_code,
-                )
-
-            if run.attempt_number <= self.settings.automatic_retry_budget:
+            if decision.final_state == "retry_pending":
                 retries_used += 1
-                reason_code = "retry allowed"
-                self.ledger.append_event(
-                    run_id,
-                    event_type="failure.policy.decision",
-                    reason_code=reason_code,
-                    payload={"fingerprint": fingerprint, "decision": "retry_pending"},
-                )
-                self.ledger.transition_run(
-                    run_id,
-                    "retry_pending",
-                    reason_code,
-                    failure_fingerprint=fingerprint,
-                )
                 continue
 
-            reason_code = "retry denied: automatic retry budget exhausted"
+            return FailurePolicyResult(
+                run_id=run_id,
+                final_state=decision.final_state,
+                retries_used=retries_used,
+                attempt_number=decision.attempt_number,
+                last_failure_fingerprint=decision.last_failure_fingerprint,
+                reason_code=decision.reason_code,
+            )
+
+    def recover_orphaned_run(
+        self,
+        run_id: str,
+        failure_class: str,
+        reason_code: str,
+        command_name: str = "",
+        dominant_token: str = "",
+    ) -> FailurePolicyResult:
+        run = self.ledger.get_run(run_id)
+        if run.current_state == "running":
+            run = self.ledger.transition_run(
+                run_id,
+                "analyzing_failure",
+                reason_code,
+                runner_signal=failure_class,
+            )
+        elif run.current_state != "analyzing_failure":
+            raise RuntimeError(
+                f"run '{run_id}' must be in 'running' or 'analyzing_failure' for recovery"
+            )
+
+        actual_command_name = command_name or Path(self.adapter.codex_command).name
+        actual_dominant_token = dominant_token or self._dominant_token(run_id)
+        self.ledger.append_event(
+            run_id,
+            event_type="failure.policy.recovered_failure",
+            reason_code=reason_code,
+            payload={
+                "failure_class": failure_class,
+                "command_name": actual_command_name,
+                "dominant_token": actual_dominant_token,
+            },
+            attempt_number=run.attempt_number,
+        )
+        return self._apply_failure_policy(
+            run_id=run_id,
+            command_name=actual_command_name,
+            failure_class=failure_class,
+            dominant_token=actual_dominant_token,
+        )
+
+    def _normalize_failure_fingerprint(
+        self,
+        command_name: str,
+        failure_class: str,
+        dominant_token: str,
+    ) -> str:
+        return f"{command_name}|{failure_class}|{dominant_token}"
+
+    def _apply_failure_policy(
+        self,
+        run_id: str,
+        command_name: str,
+        failure_class: str,
+        dominant_token: str,
+    ) -> FailurePolicyResult:
+        fingerprint = self._normalize_failure_fingerprint(
+            command_name=command_name,
+            failure_class=failure_class,
+            dominant_token=dominant_token,
+        )
+        existing = [item.fingerprint for item in self.ledger.list_failure_fingerprints(run_id)]
+        self.ledger.record_failure_fingerprint(
+            run_id=run_id,
+            fingerprint=fingerprint,
+            command_name=command_name,
+            failure_class=failure_class,
+            dominant_token=dominant_token,
+        )
+        run = self.ledger.get_run(run_id)
+
+        if fingerprint in existing:
+            reason_code = "retry denied: duplicate failure fingerprint"
             self.ledger.append_event(
                 run_id,
                 event_type="failure.policy.decision",
@@ -135,17 +177,56 @@ class FailureSignalController:
             return FailurePolicyResult(
                 run_id=run_id,
                 final_state=run.current_state,
-                retries_used=retries_used,
+                retries_used=0,
                 attempt_number=run.attempt_number,
                 last_failure_fingerprint=fingerprint,
                 reason_code=reason_code,
             )
 
-    def _normalize_failure_fingerprint(self, execution: CodexExecutionResult, run_id: str) -> str:
-        command_name = Path(execution.command[0]).name
-        failure_class = self._failure_class(execution)
-        dominant_token = self._dominant_token(run_id)
-        return f"{command_name}|{failure_class}|{dominant_token}"
+        if run.attempt_number <= self.settings.automatic_retry_budget:
+            reason_code = "retry allowed"
+            self.ledger.append_event(
+                run_id,
+                event_type="failure.policy.decision",
+                reason_code=reason_code,
+                payload={"fingerprint": fingerprint, "decision": "retry_pending"},
+            )
+            run = self.ledger.transition_run(
+                run_id,
+                "retry_pending",
+                reason_code,
+                failure_fingerprint=fingerprint,
+            )
+            return FailurePolicyResult(
+                run_id=run_id,
+                final_state=run.current_state,
+                retries_used=1,
+                attempt_number=run.attempt_number,
+                last_failure_fingerprint=fingerprint,
+                reason_code=reason_code,
+            )
+
+        reason_code = "retry denied: automatic retry budget exhausted"
+        self.ledger.append_event(
+            run_id,
+            event_type="failure.policy.decision",
+            reason_code=reason_code,
+            payload={"fingerprint": fingerprint, "decision": "halted"},
+        )
+        run = self.ledger.transition_run(
+            run_id,
+            "halted",
+            reason_code,
+            failure_fingerprint=fingerprint,
+        )
+        return FailurePolicyResult(
+            run_id=run_id,
+            final_state=run.current_state,
+            retries_used=0,
+            attempt_number=run.attempt_number,
+            last_failure_fingerprint=fingerprint,
+            reason_code=reason_code,
+        )
 
     def _failure_class(self, execution: CodexExecutionResult) -> str:
         if execution.failure_signal:

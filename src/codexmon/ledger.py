@@ -1078,6 +1078,31 @@ class RunLedger:
             ).fetchall()
         return [self._row_to_projection(row) for row in rows]
 
+    def list_recoverable_runs(self, limit: int = 10) -> list[RunProjection]:
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT runs.*, tasks.instruction_summary
+                FROM runs
+                JOIN tasks ON tasks.task_id = runs.task_id
+                WHERE runs.current_state IN (
+                  'running',
+                  'analyzing_failure'
+                )
+                ORDER BY CASE runs.current_state
+                  WHEN 'running' THEN 1
+                  WHEN 'analyzing_failure' THEN 2
+                  ELSE 99
+                END,
+                runs.updated_at ASC,
+                runs.created_at ASC
+                LIMIT ?
+                """,
+                (max(1, limit),),
+            ).fetchall()
+        return [self._row_to_projection(row) for row in rows]
+
     def list_events(self, run_id: str, limit: int = 200) -> list[EventRecord]:
         self.initialize()
         with self._connect() as conn:
