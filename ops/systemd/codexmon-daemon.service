@@ -1,0 +1,21 @@
+[Unit]
+Description=codexmon daemon worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/codexmon
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-%h/projects/codexmon/ops/systemd/codexmon-daemon.env
+ExecStart=%h/projects/codexmon/scripts/run-codexmon-daemon.sh
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+SuccessExitStatus=0 143
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

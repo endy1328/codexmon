@@ -5,7 +5,7 @@
 감지하며, 각 자율 실행을 아래 세 가지 명시적 결과 중 하나로 끝내는 것이
 목표다.
 
-현재 개발 버전은 `0.0.0.5`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
+현재 개발 버전은 `0.0.0.6`이다. 버전 형식은 `major.major.minor.minor` 4자리 고정이며,
 왼쪽 두 자리는 메이저 버전, 오른쪽 두 자리는 마이너 버전으로 사용한다.
 
 - `PR opened`
@@ -16,7 +16,7 @@
 
 이 저장소는 이제 `구현 진행 중` 단계이며, 첫 구현 슬라이스, 마일스톤 `M4`,
 `M5` supervisor runtime baseline, `M6` daemon worker baseline, `M7` crash
-recovery baseline이 완료됐다.
+recovery baseline, `M8` service packaging baseline이 완료됐다.
 
 현재 존재하는 것:
 - 정본 설계 문서 세트
@@ -42,11 +42,12 @@ recovery baseline이 완료됐다.
 - queued/retry_pending/pr_handoff run 자동 pickup과 operator approve 후 비동기 재개
 - orphaned `running`/`analyzing_failure` run을 daemon이 retry 또는 halt로 복구하는 경로
 - orphaned runner interrupt, duplicate fingerprint halt, recovery lock release 검증
+- `daemon serve`의 SIGTERM/SIGINT stop hook과 service-manager 친화적 종료 경로
+- systemd unit 템플릿, daemon wrapper 스크립트, service runbook
 - 최소 `start`, `status`, `stop`, `retry`, `approvals`, `workspace`, `runner`,
   `telegram`, `handoff`, `doctor`, `version`, `execute`, `daemon` CLI와 baseline test
 
 아직 존재하지 않는 것:
-- 외부 process manager 연동과 service packaging
 - progress monitor의 DB 직접 연동
 
 ## 고정된 v1 결정
@@ -69,6 +70,7 @@ recovery baseline이 완료됐다.
 - `docs/ACCEPTANCE_CHECKLIST.md`
 - `docs/IMPLEMENTATION_SLICE.md`
 - `docs/EXECUTION_PLAN.md`
+- `docs/SERVICE_RUNBOOK.md`
 
 ## 보조 운영 기록
 
@@ -97,10 +99,11 @@ legible하며 recoverable하게 만드는 도구다.
 
 ## 다음 단계
 
-첫 구현 슬라이스, daemon worker baseline, crash recovery baseline은 닫힌 상태다.
+첫 구현 슬라이스, daemon worker baseline, crash recovery baseline, service
+packaging baseline은 닫힌 상태다.
 다음 프로젝트 단계는 `docs/IMPLEMENTATION_SLICE.md`와
-`docs/EXECUTION_PLAN.md`를 기준으로 service packaging과 progress monitor의
-DB 직접 연동을 구현하는 것이다.
+`docs/EXECUTION_PLAN.md`를 기준으로 progress monitor의 DB 직접 연동을 구현하는
+것이다.
 
 ## 구현 기준선
 
@@ -119,6 +122,7 @@ DB 직접 연동을 구현하는 것이다.
 - synchronous `start --execute`, `execute` runtime 경로
 - `daemon run-once`, `daemon serve`, `daemon status` background worker 경로
 - orphaned run crash recovery와 recovery-driven retry/halt 경로
+- SIGTERM/SIGINT stop hook, daemon wrapper 스크립트, systemd service packaging baseline
 - stage C acceptance validation suite와 인수 체크리스트 대응 검증
 - `unittest` 기반 테스트
 - `Makefile` 기반 기본 실행 명령

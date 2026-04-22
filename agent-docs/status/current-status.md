@@ -6,7 +6,7 @@
 
 `구현 진행 중`
 
-첫 구현 슬라이스, 마일스톤 `M4`, `M5`, `M6`, `M7`은 완료됐다.
+첫 구현 슬라이스, 마일스톤 `M4`, `M5`, `M6`, `M7`, `M8`은 완료됐다.
 
 ## 완료
 
@@ -60,6 +60,10 @@
 - recovery-driven retry/halt decision과 terminal lock release가 추가됐다
 - orphaned runner interrupt와 recovery policy 검증이 추가됐다
 - 마일스톤 `M7`이 완료됐다
+- `daemon serve`의 SIGTERM/SIGINT stop hook이 추가됐다
+- daemon wrapper 스크립트, systemd unit 템플릿, service env 예시가 추가됐다
+- 서비스 운영 runbook과 packaging asset 검증이 추가됐다
+- 마일스톤 `M8`이 완료됐다
 
 ## 진행 중
 
@@ -67,7 +71,6 @@
 
 ## 대기 중
 
-- 외부 process manager 연동과 service packaging
 - progress monitor의 DB 직접 연동
 
 ## 리스크 및 블로커
@@ -75,7 +78,8 @@
 - `pytest`, `ruff`, `uv`는 아직 설치되지 않았고 현재 baseline은 stdlib-first 기준이다
 - 현재 crash recovery는 orphaned runner를 interrupt 후 retry 또는 halt로 복구하는 baseline이며
   기존 프로세스에 스트림을 재부착하는 live reattachment는 아직 없다
-- daemon lifecycle을 system service로 배포·관리하는 운영면은 아직 없다
+- service packaging baseline은 systemd 기준 reference implementation이며,
+  추가 process manager 템플릿은 아직 없다
 - progress monitor는 아직 static snapshot 기반이고 DB를 직접 읽지 않는다
 - 구현 단계는 runner, notifier, merge scope에 대한 고정 v1 결정을 다시 열지 않고
   진행해야 하며, 바꾸려면 명시적 재판단이 필요하다

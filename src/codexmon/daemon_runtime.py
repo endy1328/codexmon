@@ -162,6 +162,8 @@ class SupervisorDaemon:
         iterations: int = 0,
         poll_interval_seconds: float | None = None,
         sleep_fn: Callable[[float], None] = time.sleep,
+        install_signal_handlers: bool = True,
+        stop_condition: Callable[[], str] | None = None,
     ) -> DaemonServeResult:
         actual_interval = poll_interval_seconds if poll_interval_seconds is not None else self.poll_interval_seconds
         stop_reason = "iterations exhausted"
@@ -171,6 +173,11 @@ class SupervisorDaemon:
         total_iterations = 0
         last_run_id = ""
         last_state = ""
+        stop_state = {"reason": ""}
+        previous_handlers: dict[signal.Signals, object] = {}
+
+        if install_signal_handlers:
+            previous_handlers = self._install_stop_signal_handlers(stop_state)
 
         self._record(
             "started",
@@ -178,6 +185,10 @@ class SupervisorDaemon:
         )
         try:
             while True:
+                requested_stop = self._consume_stop_reason(stop_state, stop_condition)
+                if requested_stop:
+                    stop_reason = requested_stop
+                    break
                 total_iterations += 1
                 tick = self.run_once(chat_id=chat_id)
                 if tick.processed and tick.ok:
@@ -191,11 +202,18 @@ class SupervisorDaemon:
                 if tick.final_state:
                     last_state = tick.final_state
 
+                requested_stop = self._consume_stop_reason(stop_state, stop_condition)
+                if requested_stop:
+                    stop_reason = requested_stop
+                    break
                 if iterations > 0 and total_iterations >= iterations:
                     break
                 sleep_fn(actual_interval)
         except KeyboardInterrupt:
-            stop_reason = "keyboard interrupt"
+            stop_reason = "signal:SIGINT"
+        finally:
+            if install_signal_handlers:
+                self._restore_signal_handlers(previous_handlers)
         self._record(
             "stopped",
             run_id=last_run_id,
@@ -486,6 +504,39 @@ class SupervisorDaemon:
         except PermissionError:
             return True
         return True
+
+    def _install_stop_signal_handlers(self, stop_state: dict[str, str]) -> dict[signal.Signals, object]:
+        previous_handlers: dict[signal.Signals, object] = {}
+
+        def _handler(signum: int, _frame: object) -> None:
+            try:
+                signal_name = signal.Signals(signum).name
+            except ValueError:
+                signal_name = str(signum)
+            stop_state["reason"] = f"signal:{signal_name}"
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            previous_handlers[sig] = signal.getsignal(sig)
+            signal.signal(sig, _handler)
+        return previous_handlers
+
+    def _restore_signal_handlers(self, previous_handlers: dict[signal.Signals, object]) -> None:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
+
+    def _consume_stop_reason(
+        self,
+        stop_state: dict[str, str],
+        stop_condition: Callable[[], str] | None,
+    ) -> str:
+        if stop_state["reason"]:
+            return stop_state["reason"]
+        if stop_condition is None:
+            return ""
+        requested = stop_condition()
+        if requested:
+            stop_state["reason"] = requested
+        return stop_state["reason"]
 
     def _tick_result(
         self,

@@ -38,11 +38,12 @@
 - 마일스톤 M6 완료
 - crash recovery baseline 완료
 - 마일스톤 M7 완료
+- service packaging baseline 완료
+- 마일스톤 M8 완료
 - `README.md`, `agent.md`를 정본 문서 모델에 맞게 정렬
 
 ## 다음 운영 작업
 
-- 외부 process manager 연동과 service packaging 설계
 - progress monitor DB 직접 연동 설계
 
 ## 검증 누적
@@ -58,6 +59,7 @@
 - `agent-docs/validation/m5-supervisor-runtime-validation.md`
 - `agent-docs/validation/m6-daemon-runtime-validation.md`
 - `agent-docs/validation/m7-crash-recovery-validation.md`
+- `agent-docs/validation/m8-service-packaging-validation.md`
 
 
 ## 이후로 미루는 항목

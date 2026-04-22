@@ -25,7 +25,6 @@
 
 아직 시작하지 않은 것:
 
-- 외부 process manager 연동과 service packaging
 - progress monitor의 DB 직접 연동
 
 ## 실행 원칙
@@ -76,7 +75,9 @@
   async operator resume pickup, `daemon run-once/serve/status`가 반영됐다
 - 마일스톤 M7이 완료되면서 orphaned `running`/`analyzing_failure` recovery,
   recovery-driven retry/halt, terminal lock release가 반영됐다
-- 다음 작업은 service packaging과 progress monitor DB 연동이다
+- 마일스톤 M8이 완료되면서 SIGTERM/SIGINT stop hook, daemon wrapper,
+  systemd service template, service runbook이 반영됐다
+- 다음 작업은 progress monitor DB 연동이다
 
 ## 구현 마일스톤 개요
 
@@ -92,7 +93,7 @@
 | M5 | Supervisor Runtime Baseline | R1 | synchronous orchestrator, preflight/runtime/handoff 연결 | `start --execute` 또는 `execute`로 단일 run을 끝까지 진행할 수 있다 |
 | M6 | Daemon Worker Baseline | R2 | polling daemon, runtime heartbeat, async resume pickup | background worker가 runnable run을 계속 처리할 수 있다 |
 | M7 | Crash Recovery Baseline | R3 | orphan recovery, recovery policy, terminal cleanup | daemon restart 뒤 orphaned run을 retry 또는 halt로 복구할 수 있다 |
-| M8 | Service Packaging Baseline | R4 | 외부 process manager 연동, daemon runbook, 운영 배포 기준 | 터미널 세션과 분리된 daemon lifecycle 운영 기준이 성립한다 |
+| M8 | Service Packaging Baseline | R4 | systemd service template, daemon runbook, 운영 배포 기준 | 터미널 세션과 분리된 daemon lifecycle 운영 기준이 성립한다 |
 | M9 | Progress Monitor Live DB | R5 | durable runtime state 조회, live progress rendering | progress monitor가 static snapshot 없이 현재 runtime 상태를 읽는다 |
 
 ## 단계 B: 첫 구현 슬라이스 작업 패킷
@@ -184,7 +185,7 @@
 - 선행 의존성: 작업 패킷 R3
 - 산출물: daemon runbook, service template, 운영 배포 기준
 - 검증: service manager 아래 daemon 시작/중지/재시작 일관성
-- 현재 상태: 대기
+- 현재 상태: 완료
 
 ### 작업 패킷 R5: Progress Monitor Live DB
 
@@ -217,7 +218,7 @@
 
 현재 상태:
 - 완료
-- 후속 구현은 running state crash recovery, 외부 service packaging, progress monitor DB 직접 연동 순으로 이어진다
+- 후속 구현은 외부 service packaging, progress monitor DB 직접 연동 순으로 이어진다
 
 ### 마일스톤 M1: 기반 레이어 구축
 
@@ -448,13 +449,40 @@
 - 완료
 - 검증 기록: `agent-docs/validation/m7-crash-recovery-validation.md`
 
+### 마일스톤 M8: Service Packaging Baseline
+
+목표:
+- daemon lifecycle을 외부 process manager 아래에서 일관되게 운영할 수 있게 한다
+
+포함 범위:
+- 작업 패킷 R4
+
+세부 작업:
+- `daemon serve`의 SIGTERM/SIGINT stop hook 구현
+- daemon wrapper 스크립트와 systemd unit 템플릿 추가
+- service env 예시와 운영 runbook 작성
+- packaging asset 검증과 service baseline validation 기록 추가
+
+핵심 산출물:
+- service-manager 친화적 daemon 종료 경로
+- systemd packaging baseline
+- service 운영 runbook
+
+검증 포인트:
+- external stop reason이 `daemon serve`의 stopped heartbeat에 반영된다
+- systemd unit과 wrapper/script 자산이 일관된 경로를 참조한다
+- service baseline 자산이 테스트와 문서로 검증된다
+
+현재 상태:
+- 완료
+- 검증 기록: `agent-docs/validation/m8-service-packaging-validation.md`
+
 ## 단계 D: Runtime 확장
 
 목표:
-- current daemon baseline을 crash recovery와 운영 배포 가능한 형태로 확장한다
+- current daemon baseline을 운영 배포 가능한 형태와 live monitor로 확장한다
 
 필수 검증:
-- 외부 process manager 아래에서도 daemon 생명주기와 heartbeat가 일관된다
 - progress monitor가 static snapshot이 아니라 durable runtime state를 직접 읽는다
 
 종료 조건:
@@ -493,5 +521,5 @@
 
 ## 즉시 다음 작업
 
-마일스톤 M1, M2, M3, M4, M5, M6, M7은 완료됐다.
-다음 작업은 service packaging과 progress monitor DB 연동이다.
+마일스톤 M1, M2, M3, M4, M5, M6, M7, M8은 완료됐다.
+다음 작업은 progress monitor DB 연동이다.

@@ -248,7 +248,7 @@ class SupervisorDaemonTestCase(unittest.TestCase):
     def test_serve_records_started_idle_and_stopped_heartbeats(self) -> None:
         daemon = self._build_daemon(str(make_script(self.base_path, "noop.sh", "exit 0\n")))
 
-        result = daemon.serve(iterations=2, sleep_fn=lambda *_: None)
+        result = daemon.serve(iterations=2, sleep_fn=lambda *_: None, install_signal_handlers=False)
         heartbeats = self.ledger.list_runtime_heartbeats(limit=10, worker_name="codexmon-daemon")
         statuses = [item.status for item in heartbeats]
 
@@ -257,6 +257,30 @@ class SupervisorDaemonTestCase(unittest.TestCase):
         self.assertIn("started", statuses)
         self.assertIn("idle", statuses)
         self.assertIn("stopped", statuses)
+
+    def test_serve_respects_external_stop_reason_for_service_manager(self) -> None:
+        daemon = self._build_daemon(str(make_script(self.base_path, "service-noop.sh", "exit 0\n")))
+        state = {"calls": 0}
+
+        def stop_condition() -> str:
+            state["calls"] += 1
+            if state["calls"] >= 2:
+                return "signal:SIGTERM"
+            return ""
+
+        result = daemon.serve(
+            iterations=0,
+            sleep_fn=lambda *_: None,
+            install_signal_handlers=False,
+            stop_condition=stop_condition,
+        )
+        heartbeats = self.ledger.list_runtime_heartbeats(limit=10, worker_name="codexmon-daemon")
+        stopped = heartbeats[0]
+
+        self.assertEqual(result.stop_reason, "signal:SIGTERM")
+        self.assertEqual(result.iterations, 1)
+        self.assertEqual(stopped.status, "stopped")
+        self.assertEqual(stopped.payload["stop_reason"], "signal:SIGTERM")
 
 
 if __name__ == "__main__":

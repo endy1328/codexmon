@@ -22,8 +22,8 @@
 - 첫 notifier는 `Telegram`
 - 첫 local control plane은 CLI
 - 첫 supervisor runtime은 synchronous single-run execution
-- local polling daemon worker와 orphan crash recovery baseline이 구현됐다
-- 다음 runtime 확장은 외부 process manager 연동과 progress monitor live DB 연동이다
+- local polling daemon worker, orphan crash recovery, systemd service packaging baseline이 구현됐다
+- 다음 runtime 확장은 progress monitor live DB 연동이다
 - 첫 durable store는 로컬 `SQLite`
 - 첫 GitHub 범위는 PR 생성 + CI 가시화
 
@@ -46,7 +46,7 @@ auto-merge는 범위 밖이다.
    CI visibility 상태를 기록한다.
 9. background daemon worker는 `queued`, `retry_pending`, `pr_handoff` run을
    polling하고, orphaned `running`/`analyzing_failure` run을 recovery하며,
-   heartbeat를 durable store에 남긴다.
+   service manager 아래에서도 일관된 stop reason과 heartbeat를 남긴다.
 
 ## 컴포넌트 책임
 
